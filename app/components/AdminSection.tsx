@@ -56,16 +56,6 @@ export default function AdminSection() {
     }
   };
 
-  const handleUpdateRate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await updateRate(updateRateValue);
-      alert('Rate updated successfully!');
-      setUpdateRateValue('');
-    } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  };
 
   const handleFetchPool = async () => {
     if (!stakingMint) {
@@ -235,7 +225,7 @@ export default function AdminSection() {
                   Update Rate (Not Available)
                 </button>
                 <p className="text-red-400 text-sm">
-                  To fix this, use a different staking mint in "Initialize Pool" section
+                  To fix this, use a different staking mint in &quot;Initialize Pool&quot; section
                 </p>
               </div>
             </div>
