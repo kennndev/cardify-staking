@@ -60,6 +60,11 @@ export default function StakingPage() {
     return Math.floor(userData.staked * 0.1); // Placeholder calculation
   };
 
+  // Helper function to format token amounts (assuming 9 decimals like SOL)
+  const formatTokenAmount = (amount: number, decimals: number = 9) => {
+    return (amount / Math.pow(10, decimals)).toFixed(6);
+  };
+
   if (!walletAddress) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
@@ -93,7 +98,7 @@ export default function StakingPage() {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-300">Total Staked:</span>
-                  <span className="text-white font-medium">{poolData.totalStaked.toLocaleString()}</span>
+                  <span className="text-white font-medium">{formatTokenAmount(poolData.totalStaked)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Reward Rate:</span>
@@ -118,11 +123,11 @@ export default function StakingPage() {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-300">Staked Amount:</span>
-                  <span className="text-white font-medium">{userData.staked.toLocaleString()}</span>
+                  <span className="text-white font-medium">{formatTokenAmount(userData.staked)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Pending Rewards:</span>
-                  <span className="text-green-400 font-medium">{calculatePendingRewards().toLocaleString()}</span>
+                  <span className="text-green-400 font-medium">{formatTokenAmount(calculatePendingRewards())}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Reward Debt:</span>
