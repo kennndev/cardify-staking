@@ -5,19 +5,26 @@ import { useStaking } from '../contexts/StakingContext';
 export default function DashboardCards() {
   const { poolData, userData, stakingMint } = useStaking();
 
+  // Helper function to format token amounts (assuming 9 decimals like SOL)
+  const formatTokenAmount = (amount: number, decimals: number = 9) => {
+    return (amount / Math.pow(10, decimals)).toFixed(6);
+  };
+
   // Log APY calculation details
   if (poolData) {
     const ratePerSec = poolData.ratePerSec || 0;
-    const totalStaked = poolData.totalStaked || 0;
+    const totalStakedRaw = poolData.totalStaked || 0;
+    const totalStakedFormatted = formatTokenAmount(totalStakedRaw);
     const secondsPerYear = 31536000;
-    const apy = totalStaked > 0 ? (ratePerSec * secondsPerYear / totalStaked * 100) : 0;
+    const apy = totalStakedRaw > 0 ? (ratePerSec * secondsPerYear / totalStakedRaw * 100) : 0;
     
     console.log('APY Calculation:', {
       ratePerSec,
-      totalStaked,
+      totalStaked: totalStakedRaw,
+      totalStakedFormatted,
       secondsPerYear,
       apy: apy.toFixed(6) + '%',
-      formula: `(${ratePerSec} * ${secondsPerYear} / ${totalStaked}) * 100 = ${apy.toFixed(6)}%`
+      formula: `(${ratePerSec} * ${secondsPerYear} / ${totalStakedRaw}) * 100 = ${apy.toFixed(6)}%`
     });
   }
 
@@ -34,7 +41,7 @@ export default function DashboardCards() {
     },
     {
       title: 'STAKED AMOUNT',
-      value: userData ? (userData.staked || 0).toLocaleString() : '0',
+      value: userData ? formatTokenAmount(userData.staked || 0) : '0',
       subtitle: `${stakingMint ? stakingMint.slice(0, 4) : 'TOKEN'} TOKENS STAKED`,
       icon: '💰',
       color: 'from-blue-400 to-purple-500',
@@ -42,7 +49,7 @@ export default function DashboardCards() {
     },
     {
       title: 'TOTAL POOL',
-      value: poolData ? (poolData.totalStaked || 0).toLocaleString() : '0',
+      value: poolData ? formatTokenAmount(poolData.totalStaked || 0) : '0',
       subtitle: 'TOTAL STAKED IN POOL',
       icon: '🎯',
       color: 'from-teal-400 to-green-500',
