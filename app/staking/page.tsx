@@ -65,16 +65,6 @@ export default function StakingPage() {
     return (amount / Math.pow(10, decimals)).toFixed(6);
   };
 
-  if (!walletAddress) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-8 text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">Connect Your Wallet</h1>
-          <p className="text-gray-300">Please connect your wallet to access the staking dashboard.</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-6">
@@ -119,7 +109,12 @@ export default function StakingPage() {
           {/* User Stats */}
           <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-white mb-4">Your Staking</h3>
-            {userData ? (
+            {!walletAddress ? (
+              <div className="text-center py-4">
+                <p className="text-gray-400 mb-2">Connect your wallet to view your staking data</p>
+                <p className="text-sm text-gray-500">Use the wallet connection button in the header</p>
+              </div>
+            ) : userData ? (
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-300">Staked Amount:</span>
@@ -142,22 +137,29 @@ export default function StakingPage() {
           {/* Quick Actions */}
           <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
-            <div className="space-y-3">
-              <button
-                onClick={handleClaim}
-                disabled={isLoading || !userData || calculatePendingRewards() === 0}
-                className="w-full bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
-              >
-                {isLoading ? 'Processing...' : 'Claim Rewards'}
-              </button>
-              <button
-                onClick={refreshData}
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
-              >
-                {isLoading ? 'Refreshing...' : 'Refresh Data'}
-              </button>
-            </div>
+            {!walletAddress ? (
+              <div className="text-center py-4">
+                <p className="text-gray-400 mb-2">Connect your wallet to access staking actions</p>
+                <p className="text-sm text-gray-500">Use the wallet connection button in the header</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <button
+                  onClick={handleClaim}
+                  disabled={isLoading || !userData || calculatePendingRewards() === 0}
+                  className="w-full bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
+                >
+                  {isLoading ? 'Processing...' : 'Claim Rewards'}
+                </button>
+                <button
+                  onClick={refreshData}
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
+                >
+                  {isLoading ? 'Refreshing...' : 'Refresh Data'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -165,51 +167,65 @@ export default function StakingPage() {
           {/* Stake Tokens */}
           <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
             <h2 className="text-xl font-semibold text-white mb-4">Stake Tokens</h2>
-            <form onSubmit={handleStake} className="space-y-4">
-              <div>
-                <label className="block text-gray-300 text-sm mb-2">Amount to Stake</label>
-                <input
-                  type="number"
-                  value={stakeAmount}
-                  onChange={(e) => setStakeAmount(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter amount to stake"
-                  required
-                />
+            {!walletAddress ? (
+              <div className="text-center py-4">
+                <p className="text-gray-400 mb-2">Connect your wallet to stake tokens</p>
+                <p className="text-sm text-gray-500">Use the wallet connection button in the header</p>
               </div>
-              <button
-                type="submit"
-                disabled={isLoading || !poolData}
-                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
-              >
-                {isLoading ? 'Staking...' : 'Stake Tokens'}
-              </button>
-            </form>
+            ) : (
+              <form onSubmit={handleStake} className="space-y-4">
+                <div>
+                  <label className="block text-gray-300 text-sm mb-2">Amount to Stake</label>
+                  <input
+                    type="number"
+                    value={stakeAmount}
+                    onChange={(e) => setStakeAmount(e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter amount to stake"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading || !poolData}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
+                >
+                  {isLoading ? 'Staking...' : 'Stake Tokens'}
+                </button>
+              </form>
+            )}
           </div>
 
           {/* Unstake Tokens */}
           <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
             <h2 className="text-xl font-semibold text-white mb-4">Unstake Tokens</h2>
-            <form onSubmit={handleUnstake} className="space-y-4">
-              <div>
-                <label className="block text-gray-300 text-sm mb-2">Amount to Unstake</label>
-                <input
-                  type="number"
-                  value={unstakeAmount}
-                  onChange={(e) => setUnstakeAmount(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter amount to unstake"
-                  required
-                />
+            {!walletAddress ? (
+              <div className="text-center py-4">
+                <p className="text-gray-400 mb-2">Connect your wallet to unstake tokens</p>
+                <p className="text-sm text-gray-500">Use the wallet connection button in the header</p>
               </div>
-              <button
-                type="submit"
-                disabled={isLoading || !poolData || !userData || userData.staked === 0}
-                className="w-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
-              >
-                {isLoading ? 'Unstaking...' : 'Unstake Tokens'}
-              </button>
-            </form>
+            ) : (
+              <form onSubmit={handleUnstake} className="space-y-4">
+                <div>
+                  <label className="block text-gray-300 text-sm mb-2">Amount to Unstake</label>
+                  <input
+                    type="number"
+                    value={unstakeAmount}
+                    onChange={(e) => setUnstakeAmount(e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter amount to unstake"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading || !poolData || !userData || userData.staked === 0}
+                  className="w-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
+                >
+                  {isLoading ? 'Unstaking...' : 'Unstake Tokens'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>
