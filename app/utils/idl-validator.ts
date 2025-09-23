@@ -1,5 +1,33 @@
 // IDL validator to check if the IDL structure is correct
-export function validateIDL(idl: any): { isValid: boolean; errors: string[] } {
+
+interface IDLInstruction {
+  name: string;
+  accounts?: unknown[];
+  args?: unknown[];
+}
+
+interface IDLAccount {
+  name: string;
+  type: {
+    fields?: unknown[];
+  };
+}
+
+interface IDLType {
+  name: string;
+  type: unknown;
+}
+
+interface IDL {
+  version?: string;
+  name?: string;
+  address?: string;
+  instructions?: IDLInstruction[];
+  accounts?: IDLAccount[];
+  types?: IDLType[];
+}
+
+export function validateIDL(idl: IDL): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
   
   // Check required top-level fields
@@ -11,7 +39,7 @@ export function validateIDL(idl: any): { isValid: boolean; errors: string[] } {
   
   // Check instructions
   if (idl.instructions && Array.isArray(idl.instructions)) {
-    idl.instructions.forEach((ix: any, index: number) => {
+    idl.instructions.forEach((ix: IDLInstruction, index: number) => {
       if (!ix.name) errors.push(`Instruction ${index} missing name`);
       if (!ix.accounts) errors.push(`Instruction ${ix.name} missing accounts`);
       if (!ix.args) errors.push(`Instruction ${ix.name} missing args`);
@@ -20,7 +48,7 @@ export function validateIDL(idl: any): { isValid: boolean; errors: string[] } {
   
   // Check accounts
   if (idl.accounts && Array.isArray(idl.accounts)) {
-    idl.accounts.forEach((account: any, index: number) => {
+    idl.accounts.forEach((account: IDLAccount, index: number) => {
       if (!account.name) errors.push(`Account ${index} missing name`);
       if (!account.type) errors.push(`Account ${account.name} missing type`);
       if (!account.type.fields) errors.push(`Account ${account.name} missing fields`);
@@ -29,7 +57,7 @@ export function validateIDL(idl: any): { isValid: boolean; errors: string[] } {
   
   // Check types
   if (idl.types && Array.isArray(idl.types)) {
-    idl.types.forEach((type: any, index: number) => {
+    idl.types.forEach((type: IDLType, index: number) => {
       if (!type.name) errors.push(`Type ${index} missing name`);
       if (!type.type) errors.push(`Type ${type.name} missing type definition`);
     });

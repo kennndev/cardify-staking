@@ -1,6 +1,12 @@
 // IDL loader that prefers on-chain IDL and falls back to local
 import { AnchorProvider, Program, Idl } from '@coral-xyz/anchor';
 import { Connection, PublicKey } from '@solana/web3.js';
+import idlData from '../idl/simple_staking.json';
+
+// Extended IDL interface that includes address
+interface IdlWithAddress extends Idl {
+  address?: string;
+}
 
 // Provide these from env/config
 export const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com";
@@ -20,29 +26,30 @@ export async function loadProgram(provider: AnchorProvider): Promise<Program> {
   if (!idl) {
     console.log('Falling back to local IDL...');
     // falls back to local IDL exactly as compiled
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    idl = require("../idl/simple_staking.json");
+    idl = idlData as Idl;
     console.log('✅ Local IDL loaded successfully');
   }
   
   // Optional: assert the IDL really refers to our program id
-  const idlAddr = (idl as any).address;
+  const idlWithAddress = idl as IdlWithAddress;
+  const idlAddr = idlWithAddress.address;
   if (idlAddr && idlAddr !== PROGRAM_ID.toBase58()) {
     throw new Error(`IDL.address (${idlAddr}) !== PROGRAM_ID (${PROGRAM_ID.toBase58()})`);
   }
   
   console.log('Creating program with IDL:', {
-    version: idl.version,
-    name: idl.name,
-    address: idl.address,
-    instructionsCount: idl.instructions?.length || 0,
-    accountsCount: idl.accounts?.length || 0,
-    typesCount: idl.types?.length || 0
+    version: idl?.version,
+    name: idl?.name,
+    address: idlWithAddress?.address,
+    instructionsCount: idl?.instructions?.length || 0,
+    accountsCount: idl?.accounts?.length || 0,
+    typesCount: idl?.types?.length || 0
   });
   
   return new Program(idl as Idl, PROGRAM_ID, provider);
 }
 
-export function makeProvider(connection: Connection, wallet: any) {
-  return new AnchorProvider(connection, wallet, { commitment: "confirmed" });
+export function makeProvider(connection: Connection, wallet: unknown) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return new AnchorProvider(connection, wallet as any, { commitment: "confirmed" });
 }

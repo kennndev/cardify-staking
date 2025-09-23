@@ -1,18 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // IDL normalizer to handle primitive string types vs object types mismatch
 // This fixes the "Cannot use 'in' operator to search for 'option' in publicKey" error
 
 type Idl = any;
-
-const PRIMS = new Set([
-  "publicKey", "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", 
-  "bool", "bytes", "string"
-]);
-
-// These are primitive types that should NOT be converted to {defined: "type"}
-const PRIMITIVE_TYPES = new Set([
-  "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", 
-  "bool", "bytes", "string"
-]);
 
 export function normalizeIdlTypes(idl: Idl): Idl {
   const convert = (t: any): any => {

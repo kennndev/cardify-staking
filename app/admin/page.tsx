@@ -4,13 +4,12 @@ import { useState } from 'react';
 import { useStaking } from '../contexts/StakingContext';
 
 export default function AdminPage() {
-  const { isAdmin, poolData, isLoading, error, initializePool, fundRewards, setRewardRate, pausePool } = useStaking();
+  const { isAdmin, poolData, isLoading, error, initializePool, addRewardTokens, updateRate, setRewardConfig } = useStaking();
   const [stakingMint, setStakingMint] = useState('');
   const [rewardMint, setRewardMint] = useState('');
   const [rewardRate, setRewardRateInput] = useState('');
   const [fundAmount, setFundAmount] = useState('');
   const [newRewardRate, setNewRewardRate] = useState('');
-  const [isPaused, setIsPaused] = useState(false);
 
   if (!isAdmin) {
     return (
@@ -26,7 +25,11 @@ export default function AdminPage() {
   const handleInitialize = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await initializePool(stakingMint, rewardMint, parseFloat(rewardRate));
+      await initializePool(stakingMint);
+      // If reward mint and rate are provided, set reward config
+      if (rewardMint && rewardRate) {
+        await setRewardConfig(rewardMint, parseFloat(rewardRate));
+      }
       alert('Pool initialized successfully!');
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -36,7 +39,7 @@ export default function AdminPage() {
   const handleFundRewards = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await fundRewards(parseFloat(fundAmount));
+      await addRewardTokens(parseFloat(fundAmount));
       alert('Rewards funded successfully!');
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -46,22 +49,13 @@ export default function AdminPage() {
   const handleSetRewardRate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await setRewardRate(parseFloat(newRewardRate));
+      await updateRate(parseFloat(newRewardRate));
       alert('Reward rate updated successfully!');
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
-  const handlePauseToggle = async () => {
-    try {
-      await pausePool(!isPaused);
-      setIsPaused(!isPaused);
-      alert(`Pool ${!isPaused ? 'paused' : 'unpaused'} successfully!`);
-    } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-6">
@@ -89,12 +83,12 @@ export default function AdminPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Reward Rate:</span>
-                  <span className="text-white font-medium">{poolData.rewardRatePerSecond}/sec</span>
+                  <span className="text-white font-medium">{poolData.ratePerSec}/sec</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Status:</span>
-                  <span className={`font-medium ${poolData.paused ? 'text-red-400' : 'text-green-400'}`}>
-                    {poolData.paused ? 'Paused' : 'Active'}
+                  <span className="font-medium text-green-400">
+                    Active
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -210,17 +204,6 @@ export default function AdminPage() {
           <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6 lg:col-span-2">
             <h2 className="text-xl font-semibold text-white mb-4">Pool Controls</h2>
             <div className="flex flex-wrap gap-4">
-              <button
-                onClick={handlePauseToggle}
-                disabled={isLoading}
-                className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 ${
-                  isPaused
-                    ? 'bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white'
-                    : 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white'
-                }`}
-              >
-                {isLoading ? 'Processing...' : isPaused ? 'Unpause Pool' : 'Pause Pool'}
-              </button>
             </div>
           </div>
         </div>

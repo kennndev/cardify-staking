@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { PublicKey } from '@solana/web3.js';
 
 interface Wallet {
   name: string;
@@ -60,7 +61,7 @@ export default function WalletConnection() {
             setWalletAddress(response.publicKey.toString());
             setSelectedWallet(WALLETS[0]); // Phantom
           }
-        } catch (error) {
+        } catch {
           console.log('No wallet connected');
         }
       }
@@ -205,19 +206,19 @@ declare global {
   interface Window {
     solana?: {
       isPhantom?: boolean;
-      connect: () => Promise<{ publicKey: any }>;
+      connect: () => Promise<{ publicKey: PublicKey }>;
     };
     solflare?: {
-      connect: () => Promise<{ publicKey: any }>;
+      connect: () => Promise<{ publicKey: PublicKey }>;
     };
     backpack?: {
-      connect: () => Promise<{ publicKey: any }>;
+      connect: () => Promise<{ publicKey: PublicKey }>;
     };
     glow?: {
-      connect: () => Promise<{ publicKey: any }>;
+      connect: () => Promise<{ publicKey: PublicKey }>;
     };
     coinbaseSolana?: {
-      connect: () => Promise<{ publicKey: any }>;
+      connect: () => Promise<{ publicKey: PublicKey }>;
     };
   }
 }

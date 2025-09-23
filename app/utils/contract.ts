@@ -1,22 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { 
   Connection, 
-  PublicKey, 
-  Transaction, 
-  SystemProgram,
-  SYSVAR_RENT_PUBKEY
+  PublicKey
 } from '@solana/web3.js';
-import { 
-  getAssociatedTokenAddress, 
-  createAssociatedTokenAccountInstruction,
-  getAccount
-} from '@solana/spl-token';
-import { Program, AnchorProvider, Wallet, BN, Idl } from '@coral-xyz/anchor';
-import { CONTRACT_CONFIG } from '../config/env';
+import { Program } from '@coral-xyz/anchor';
 import { loadProgram, makeProvider } from './idl-loader';
 import { 
-  poolPda, 
-  signerPda, 
-  userPda, 
   initialize as initializeHelper, 
   setRewardConfig as setRewardConfigHelper, 
   stakeTokens as stakeTokensHelper, 

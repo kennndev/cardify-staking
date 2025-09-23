@@ -57,7 +57,7 @@ export default function StakingPage() {
   const calculatePendingRewards = () => {
     if (!userData || !poolData) return 0;
     // Simplified calculation - in reality you'd use the contract's pending_rewards function
-    return Math.floor(userData.stakedAmount * 0.1); // Placeholder calculation
+    return Math.floor(userData.staked * 0.1); // Placeholder calculation
   };
 
   if (!walletAddress) {
@@ -97,12 +97,12 @@ export default function StakingPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Reward Rate:</span>
-                  <span className="text-white font-medium">{poolData.rewardRatePerSecond}/sec</span>
+                  <span className="text-white font-medium">{poolData.ratePerSec}/sec</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Status:</span>
-                  <span className={`font-medium ${poolData.paused ? 'text-red-400' : 'text-green-400'}`}>
-                    {poolData.paused ? 'Paused' : 'Active'}
+                  <span className="font-medium text-green-400">
+                    Active
                   </span>
                 </div>
               </div>
@@ -118,7 +118,7 @@ export default function StakingPage() {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-300">Staked Amount:</span>
-                  <span className="text-white font-medium">{userData.stakedAmount.toLocaleString()}</span>
+                  <span className="text-white font-medium">{userData.staked.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Pending Rewards:</span>
@@ -126,7 +126,7 @@ export default function StakingPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Reward Debt:</span>
-                  <span className="text-white font-medium">{userData.rewardDebt.toLocaleString()}</span>
+                  <span className="text-white font-medium">{userData.debt}</span>
                 </div>
               </div>
             ) : (
@@ -174,7 +174,7 @@ export default function StakingPage() {
               </div>
               <button
                 type="submit"
-                disabled={isLoading || !poolData || poolData.paused}
+                disabled={isLoading || !poolData}
                 className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
               >
                 {isLoading ? 'Staking...' : 'Stake Tokens'}
@@ -199,7 +199,7 @@ export default function StakingPage() {
               </div>
               <button
                 type="submit"
-                disabled={isLoading || !poolData || poolData.paused || !userData || userData.stakedAmount === 0}
+                disabled={isLoading || !poolData || !userData || userData.staked === 0}
                 className="w-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
               >
                 {isLoading ? 'Unstaking...' : 'Unstake Tokens'}

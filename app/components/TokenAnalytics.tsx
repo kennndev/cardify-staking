@@ -1,40 +1,11 @@
 'use client';
 
 import { useStaking } from '../contexts/StakingContext';
-import { useState, useEffect } from 'react';
 
 export default function TokenAnalytics() {
-  const { poolData, userData, stakingMint } = useStaking();
-  const [tokenPrice, setTokenPrice] = useState<number | null>(null);
-  const [marketCap, setMarketCap] = useState<number | null>(null);
-  const [volume24h, setVolume24h] = useState<number | null>(null);
-  const [priceChange24h, setPriceChange24h] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const { stakingMint } = useStaking();
 
-  // Your real mainnet token data
-  const realTokenData = {
-    address: "6mpafrxmywfyojaunxdqgw9sq2mhpuh3d6daw3xipump",
-    symbol: "YOUR TOKEN",
-    name: "Your Ultimate Token",
-    price: 0.000123, // Real price from DEX Screener
-    marketCap: 125000, // Real market cap
-    volume24h: 45000, // Real 24h volume
-    priceChange24h: 12.5, // Real 24h change
-    liquidity: 85000, // Real liquidity
-    holders: 1250, // Real holder count
-    supply: 1000000000, // Total supply
-    website: "https://dexscreener.com/solana/6mpafrxmywfyojaunxdqgw9sq2mhpuh3d6daw3xipump"
-  };
 
-  // Use real token data
-  useEffect(() => {
-    if (realTokenData) {
-      setTokenPrice(realTokenData.price);
-      setMarketCap(realTokenData.marketCap);
-      setVolume24h(realTokenData.volume24h);
-      setPriceChange24h(realTokenData.priceChange24h);
-    }
-  }, []);
 
   if (!stakingMint) {
     return (

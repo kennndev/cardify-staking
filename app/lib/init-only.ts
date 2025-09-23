@@ -1,12 +1,12 @@
-import { AnchorProvider, Program, Idl } from "@coral-xyz/anchor";
-import { Connection, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction } from "@solana/web3.js";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { AnchorProvider } from "@coral-xyz/anchor";
+import { Connection, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import {
   getAssociatedTokenAddress,
-  createAssociatedTokenAccountInstruction,
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { loadProgram, PROGRAM_ID } from "./idl-loader";
+import { loadProgram } from "./idl-loader";
 import { pk, poolPda, signerPda } from "./pda";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";
@@ -75,7 +75,7 @@ export async function initializeOnly(stakingMintStr: string, wallet: any) {
     } else {
       console.log("✅ Pool doesn't exist yet (good for initialization)");
     }
-  } catch (err) {
+  } catch {
     console.log("✅ Pool doesn't exist yet (good for initialization)");
   }
 
@@ -87,7 +87,7 @@ export async function initializeOnly(stakingMintStr: string, wallet: any) {
     } else {
       console.log("✅ Staking vault doesn't exist yet (good for initialization)");
     }
-  } catch (err) {
+  } catch {
     console.log("✅ Staking vault doesn't exist yet (good for initialization)");
   }
 
@@ -110,12 +110,12 @@ export async function initializeOnly(stakingMintStr: string, wallet: any) {
       .rpc();
   } catch (txError) {
     console.error("❌ Transaction failed:", txError);
-    console.error("Error message:", txError.message);
-    if (txError.logs) {
-      console.error("Transaction logs:", txError.logs);
+    console.error("Error message:", txError instanceof Error ? txError.message : String(txError));
+    if (txError && typeof txError === 'object' && 'logs' in txError) {
+      console.error("Transaction logs:", (txError as any).logs);
     }
-    if (txError.simulationResponse) {
-      console.error("Simulation response:", txError.simulationResponse);
+    if (txError && typeof txError === 'object' && 'simulationResponse' in txError) {
+      console.error("Simulation response:", (txError as any).simulationResponse);
     }
     throw txError;
   }

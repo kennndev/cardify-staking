@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useStaking } from '../contexts/StakingContext';
 
 const menuItems = [

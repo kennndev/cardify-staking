@@ -4,12 +4,11 @@ import { useState } from 'react';
 import { useStaking } from '../contexts/StakingContext';
 
 export default function AdminSection() {
-  const { isAdmin, poolData, isLoading, error, initializePool, fetchPoolByMint, setRewardConfig, updateRate, addRewardTokens } = useStaking();
+  const { isAdmin, poolData, isLoading, error, initializePool, fetchPoolByMint, setRewardConfig, addRewardTokens } = useStaking();
   const [stakingMint, setStakingMint] = useState('');
   const [rewardMint, setRewardMint] = useState('');
   const [ratePerSec, setRatePerSec] = useState('');
   const [rewardAmount, setRewardAmount] = useState('');
-  const [updateRateValue, setUpdateRateValue] = useState('');
 
   if (!isAdmin) {
     return (
@@ -56,16 +55,6 @@ export default function AdminSection() {
     }
   };
 
-  const handleUpdateRate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await updateRate(updateRateValue);
-      alert('Rate updated successfully!');
-      setUpdateRateValue('');
-    } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  };
 
   const handleFetchPool = async () => {
     if (!stakingMint) {
@@ -235,7 +224,7 @@ export default function AdminSection() {
                   Update Rate (Not Available)
                 </button>
                 <p className="text-red-400 text-sm">
-                  To fix this, use a different staking mint in "Initialize Pool" section
+                  To fix this, use a different staking mint in &quot;Initialize Pool&quot; section
                 </p>
               </div>
             </div>

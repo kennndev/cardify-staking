@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import WalletConnection from './WalletConnection';
 
 interface HeaderProps {
@@ -8,7 +7,7 @@ interface HeaderProps {
   isMobileMenuOpen?: boolean;
 }
 
-export default function Header({ onMobileMenuToggle, isMobileMenuOpen = false }: HeaderProps) {
+export default function Header({ onMobileMenuToggle }: HeaderProps) {
   return (
     <header className="bg-black/20 backdrop-blur-sm border-b border-white/10 p-4 relative z-50">
       <div className="flex items-center justify-between">

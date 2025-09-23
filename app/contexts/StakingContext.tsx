@@ -1,12 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Connection, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js';
+import { Connection, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
 import { AnchorProvider } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import BN from 'bn.js';
 
 import { CONTRACT_CONFIG } from '../config/env';
+
 
 // loadProgram gives us a Program built from on-chain IDL or local fallback;
 // PROGRAM_ID is built once (env → PublicKey) so all callers agree
@@ -25,8 +27,6 @@ export const SCALAR = CONTRACT_CONFIG.SCALAR;
 // Admin wallet address (string in env → PublicKey at runtime)
 export const ADMIN_WALLET = new PublicKey(CONTRACT_CONFIG.ADMIN_WALLET);
 
-// Optional: default mint your UI can show before user picks a mint
-const DEFAULT_STAKING_MINT = 'So11111111111111111111111111111111111111112';
 
 interface PoolData {
   poolAddress: string;     // Pool PDA (base58)
@@ -67,7 +67,15 @@ interface StakingContextType {
   addRewardTokens: (amount: number) => Promise<void>;
   checkRewardVaultBalance: () => Promise<number>;
   checkCurrentPoolState: () => Promise<void>;
-  computeApy: () => Promise<any>;
+  computeApy: () => Promise<{
+    ratePerSecUI: number;
+    totalStakedUI: number;
+    yearlyRewards: number;
+    secondsPerYear: number;
+    apyPercent: number;
+    decimals: { staking: number; reward: number };
+    baseUnits: { ratePerSec: number; totalStaked: number };
+  } | null>;
   stake: (amount: number) => Promise<void>;
   unstake: (amount: number) => Promise<void>;
   claim: () => Promise<void>;
@@ -108,7 +116,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       const onConnect = (pubkey: PublicKey) => setWalletAddress(pubkey.toString());
       const onDisconnect = () => setWalletAddress(null);
       
-      // Add event listeners with proper typing
+      // Add event listeners
       if ('on' in window.solana) {
         (window.solana as any).on('connect', onConnect);
         (window.solana as any).on('disconnect', onDisconnect);
@@ -137,6 +145,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     if (walletAddress && !poolData) {
       autoDetectPool();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletAddress, poolData]);
 
   // --- Data refresh ----------------------------------------------------------
@@ -165,7 +174,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         }
       };
 
-      const provider = new AnchorProvider(connection, wallet as any, { commitment: 'confirmed' });
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
       const program = await loadProgram(provider);
 
       // Ensure IDL has Pool layout
@@ -297,7 +306,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         }
       };
 
-      const provider = new AnchorProvider(connection, wallet as any, { commitment: 'confirmed' });
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
       const program = await loadProgram(provider);
 
       // Derive the pool PDA for the given staking mint
@@ -468,7 +477,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         },
       };
 
-      const provider = new AnchorProvider(connection, wallet as any, { commitment: 'confirmed' });
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
       const program = await loadProgram(provider);
 
       const poolPDA = pk(poolData.poolAddress);
@@ -666,7 +675,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       };
 
       // Create provider and program
-      const provider = new AnchorProvider(connection, wallet as any, { commitment: 'confirmed' });
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
       const program = await loadProgram(provider);
       
       // Derive accounts
@@ -754,10 +763,10 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const checkRewardVaultBalance = async () => {
+  const checkRewardVaultBalance = async (): Promise<number> => {
     if (!poolData) {
       console.log('No pool data available');
-      return;
+      return 0;
     }
     
     try {
@@ -772,7 +781,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         decimals: vaultBalance.value.decimals
       });
       
-      return vaultBalance.value.uiAmount;
+      return vaultBalance.value.uiAmount || 0;
     } catch (e) {
       console.error('Failed to check reward vault balance:', e);
       return 0;
@@ -889,7 +898,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
           throw new Error('Wallet not connected');
         },
       };
-      const provider = new AnchorProvider(connection, wallet as any, { commitment: 'confirmed' });
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
       const program  = await loadProgram(provider);
 
       const poolPDA    = pk(poolData.poolAddress);
