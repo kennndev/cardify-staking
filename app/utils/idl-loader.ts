@@ -32,12 +32,12 @@ export async function loadProgram(provider: AnchorProvider): Promise<Program> {
   }
   
   console.log('Creating program with IDL:', {
-    version: idl.version,
-    name: idl.name,
-    address: idl.address,
-    instructionsCount: idl.instructions?.length || 0,
-    accountsCount: idl.accounts?.length || 0,
-    typesCount: idl.types?.length || 0
+    version: idl?.version,
+    name: idl?.name,
+    address: (idl as any)?.address,
+    instructionsCount: idl?.instructions?.length || 0,
+    accountsCount: idl?.accounts?.length || 0,
+    typesCount: idl?.types?.length || 0
   });
   
   return new Program(idl as Idl, PROGRAM_ID, provider);
