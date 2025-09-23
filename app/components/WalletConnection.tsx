@@ -87,10 +87,54 @@ export default function WalletConnection() {
     };
   }, [showWalletOptions]);
 
+  // Detect if user is on mobile
+  const isMobile = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  // Get mobile wallet deep link
+  const getMobileWalletUrl = (wallet: Wallet) => {
+    const baseUrl = window.location.origin;
+    const encodedUrl = encodeURIComponent(baseUrl);
+    
+    switch (wallet.adapter) {
+      case 'phantom':
+        return `https://phantom.app/ul/browse/${encodedUrl}?ref=phantom`;
+      case 'solflare':
+        return `https://solflare.com/ul/browse/${encodedUrl}`;
+      case 'backpack':
+        return `https://backpack.app/ul/browse/${encodedUrl}`;
+      case 'glow':
+        return `https://glow.app/ul/browse/${encodedUrl}`;
+      case 'coinbase':
+        return `https://go.cb-w.com/dapp?cb_url=${encodedUrl}`;
+      default:
+        return wallet.url;
+    }
+  };
+
   const connectWallet = async (wallet: Wallet) => {
     try {
       if (typeof window !== 'undefined') {
         let response;
+        
+        // Check if on mobile and wallet not detected
+        if (isMobile()) {
+          const walletDetected = 
+            (wallet.adapter === 'phantom' && window.solana?.isPhantom) ||
+            (wallet.adapter === 'solflare' && window.solflare) ||
+            (wallet.adapter === 'backpack' && window.backpack) ||
+            (wallet.adapter === 'glow' && window.glow) ||
+            (wallet.adapter === 'coinbase' && window.coinbaseSolana);
+            
+          if (!walletDetected) {
+            // Redirect to mobile wallet app
+            const mobileUrl = getMobileWalletUrl(wallet);
+            window.open(mobileUrl, '_blank');
+            alert(`Please install ${wallet.name} wallet or open this link in your wallet app`);
+            return;
+          }
+        }
         
         if (wallet.adapter === 'phantom' && window.solana?.isPhantom) {
           response = await window.solana.connect();
@@ -179,6 +223,13 @@ export default function WalletConnection() {
         <div className="absolute right-0 top-full mt-2 w-72 md:w-64 bg-black/90 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-[9999]">
           <div className="p-3 md:p-4">
             <h3 className="text-white font-medium mb-3 text-sm md:text-base">Connect Wallet</h3>
+            {isMobile() && (
+              <div className="mb-3 p-2 bg-blue-500/20 border border-blue-500/30 rounded-lg">
+                <p className="text-blue-300 text-xs">
+                  📱 Mobile detected: Tap a wallet to open in your wallet app
+                </p>
+              </div>
+            )}
             <div className="space-y-1 md:space-y-2">
               {WALLETS.map((wallet) => (
                 <button
@@ -189,7 +240,9 @@ export default function WalletConnection() {
                   <span className="text-xl md:text-2xl">{wallet.icon}</span>
                   <div className="min-w-0 flex-1">
                     <div className="text-white font-medium text-sm md:text-base truncate">{wallet.name}</div>
-                    <div className="text-gray-400 text-xs md:text-sm">Click to connect</div>
+                    <div className="text-gray-400 text-xs md:text-sm">
+                      {isMobile() ? 'Tap to open in app' : 'Click to connect'}
+                    </div>
                   </div>
                 </button>
               ))}
