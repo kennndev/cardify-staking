@@ -5,7 +5,18 @@ import { useStaking } from '../contexts/StakingContext';
 import PoolSelector from './PoolSelector';
 
 export default function StakingSection() {
-  const { walletAddress, poolData, userData, isLoading, error, stake, unstake, claim, refreshData } = useStaking();
+  const {
+    walletAddress,
+    poolData,
+    userData,
+    isLoading,
+    error,
+    stake,
+    unstake,
+    claim,
+    refreshData,
+  } = useStaking();
+
   const [stakeAmount, setStakeAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
 
@@ -15,8 +26,10 @@ export default function StakingSection() {
     poolData: poolData ? 'Available' : 'Not available',
     userData: userData ? 'Available' : 'Not available',
     isLoading,
-    error
+    error,
   });
+
+  /* ---------- handlers ---------- */
 
   const handleStake = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +37,6 @@ export default function StakingSection() {
       alert('Please connect your wallet first');
       return;
     }
-    
     try {
       await stake(parseFloat(stakeAmount));
       alert('Staked successfully!');
@@ -40,7 +52,6 @@ export default function StakingSection() {
       alert('Please connect your wallet first');
       return;
     }
-    
     try {
       await unstake(parseFloat(unstakeAmount));
       alert('Unstaked successfully!');
@@ -55,7 +66,6 @@ export default function StakingSection() {
       alert('Please connect your wallet first');
       return;
     }
-    
     try {
       await claim();
       alert('Rewards claimed successfully!');
@@ -66,26 +76,21 @@ export default function StakingSection() {
 
   const calculatePendingRewards = () => {
     if (!userData || !poolData) return 0;
-    // Simplified calculation - in reality you'd use the contract's pending_rewards function
-    return Math.floor(userData.staked * 0.1); // Placeholder calculation
+    // Simplified calculation; replace with contract call if needed
+    return Math.floor(userData.staked * 0.1);
   };
 
-  if (!walletAddress) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-8 text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">Connect Your Wallet</h1>
-          <p className="text-gray-300">Please connect your wallet to access the staking dashboard.</p>
-        </div>
-      </div>
-    );
-  }
+  /* ---------- UI ---------- */
 
   return (
     <div>
       <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Staking Dashboard</h1>
-        <p className="text-gray-300 text-sm md:text-base">Stake your tokens and earn rewards</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+          Staking Dashboard
+        </h1>
+        <p className="text-gray-300 text-sm md:text-base">
+          Stake your tokens and earn rewards
+        </p>
       </div>
 
       <PoolSelector />
@@ -96,24 +101,34 @@ export default function StakingSection() {
         </div>
       )}
 
+      {/* ---------- stats & quick actions ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
         {/* Pool Stats */}
         <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-4 md:p-6 mobile-card">
-          <h3 className="text-base md:text-lg font-semibold text-white mb-3 md:mb-4">Pool Statistics</h3>
+          <h3 className="text-base md:text-lg font-semibold text-white mb-3 md:mb-4">
+            Pool Statistics
+          </h3>
           {poolData ? (
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-300">Total Staked:</span>
-                <span className="text-white font-medium">{poolData.totalStaked.toLocaleString()}</span>
+                <span className="text-white font-medium">
+                  {poolData.totalStaked.toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Reward Rate:</span>
-                <span className="text-white font-medium">{poolData.ratePerSec}/sec</span>
+                <span className="text-white font-medium">
+                  {poolData.ratePerSec}/sec
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Reward Mint:</span>
                 <span className="text-white font-medium">
-                  {poolData.rewardMint === '11111111111111111111111111111111' ? 'Not Set' : 'Configured'}
+                  {poolData.rewardMint ===
+                  '11111111111111111111111111111111'
+                    ? 'Not Set'
+                    : 'Configured'}
                 </span>
               </div>
             </div>
@@ -124,20 +139,28 @@ export default function StakingSection() {
 
         {/* User Stats */}
         <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-4 md:p-6 mobile-card">
-          <h3 className="text-base md:text-lg font-semibold text-white mb-3 md:mb-4">Your Staking</h3>
+          <h3 className="text-base md:text-lg font-semibold text-white mb-3 md:mb-4">
+            Your Staking
+          </h3>
           {userData ? (
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-300">Staked Amount:</span>
-                <span className="text-white font-medium">{userData.staked.toLocaleString()}</span>
+                <span className="text-white font-medium">
+                  {userData.staked.toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Pending Rewards:</span>
-                <span className="text-green-400 font-medium">{calculatePendingRewards().toLocaleString()}</span>
+                <span className="text-green-400 font-medium">
+                  {calculatePendingRewards().toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Reward Debt:</span>
-                <span className="text-white font-medium">{userData.debt.toLocaleString()}</span>
+                <span className="text-white font-medium">
+                  {userData.debt.toLocaleString()}
+                </span>
               </div>
             </div>
           ) : (
@@ -147,7 +170,9 @@ export default function StakingSection() {
 
         {/* Quick Actions */}
         <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-4 md:p-6 mobile-card">
-          <h3 className="text-base md:text-lg font-semibold text-white mb-3 md:mb-4">Quick Actions</h3>
+          <h3 className="text-base md:text-lg font-semibold text-white mb-3 md:mb-4">
+            Quick Actions
+          </h3>
           <div className="space-y-3">
             <button
               onClick={handleClaim}
@@ -167,13 +192,18 @@ export default function StakingSection() {
         </div>
       </div>
 
+      {/* ---------- stake / unstake forms ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-        {/* Stake Tokens */}
+        {/* Stake */}
         <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-4 md:p-6 mobile-card">
-          <h2 className="text-lg md:text-xl font-semibold text-white mb-3 md:mb-4">Stake Tokens</h2>
+          <h2 className="text-lg md:text-xl font-semibold text-white mb-3 md:mb-4">
+            Stake Tokens
+          </h2>
           <form onSubmit={handleStake} className="space-y-4">
             <div>
-              <label className="block text-gray-300 text-sm mb-2">Amount to Stake</label>
+              <label className="block text-gray-300 text-sm mb-2">
+                Amount to Stake
+              </label>
               <input
                 type="number"
                 value={stakeAmount}
@@ -188,22 +218,31 @@ export default function StakingSection() {
               disabled={isLoading || !poolData}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 touch-target"
             >
-              {isLoading ? 'Staking...' : !poolData ? 'Pool not initialized' : 'Stake Tokens'}
+              {isLoading
+                ? 'Staking...'
+                : !poolData
+                ? 'Pool not initialized'
+                : 'Stake Tokens'}
             </button>
             {!poolData && (
               <p className="text-red-400 text-sm mt-2">
-                Pool not initialized. Please initialize the pool first in the Admin section.
+                Pool not initialized. Please initialize the pool first in the
+                Admin section.
               </p>
             )}
           </form>
         </div>
 
-        {/* Unstake Tokens */}
+        {/* Unstake */}
         <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-4 md:p-6 mobile-card">
-          <h2 className="text-lg md:text-xl font-semibold text-white mb-3 md:mb-4">Unstake Tokens</h2>
+          <h2 className="text-lg md:text-xl font-semibold text-white mb-3 md:mb-4">
+            Unstake Tokens
+          </h2>
           <form onSubmit={handleUnstake} className="space-y-4">
             <div>
-              <label className="block text-gray-300 text-sm mb-2">Amount to Unstake</label>
+              <label className="block text-gray-300 text-sm mb-2">
+                Amount to Unstake
+              </label>
               <input
                 type="number"
                 value={unstakeAmount}
@@ -215,7 +254,9 @@ export default function StakingSection() {
             </div>
             <button
               type="submit"
-              disabled={isLoading || !poolData || !userData || userData.staked === 0}
+              disabled={
+                isLoading || !poolData || !userData || userData.staked === 0
+              }
               className="w-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 touch-target"
             >
               {isLoading ? 'Unstaking...' : 'Unstake Tokens'}
