@@ -15,19 +15,26 @@ export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { poolData } = useStaking();
 
+  // Helper function to format token amounts (assuming 9 decimals like SOL)
+  const formatTokenAmount = (amount: number, decimals: number = 9) => {
+    return (amount / Math.pow(10, decimals)).toFixed(6);
+  };
+
   // Log APY calculation details
   if (poolData) {
     const ratePerSec = poolData.ratePerSec || 0;
-    const totalStaked = poolData.totalStaked || 0;
+    const totalStakedRaw = poolData.totalStaked || 0;
+    const totalStakedFormatted = formatTokenAmount(totalStakedRaw);
     const secondsPerYear = 31536000;
-    const apy = totalStaked > 0 ? (ratePerSec * secondsPerYear / totalStaked * 100) : 0;
+    const apy = totalStakedRaw > 0 ? (ratePerSec * secondsPerYear / totalStakedRaw * 100) : 0;
     
     console.log('Dashboard APY Calculation:', {
       ratePerSec,
-      totalStaked,
+      totalStaked: totalStakedRaw,
+      totalStakedFormatted,
       secondsPerYear,
       apy: apy.toFixed(6) + '%',
-      formula: `(${ratePerSec} * ${secondsPerYear} / ${totalStaked}) * 100 = ${apy.toFixed(6)}%`,
+      formula: `(${ratePerSec} * ${secondsPerYear} / ${totalStakedRaw}) * 100 = ${apy.toFixed(6)}%`,
       poolData: {
         poolAddress: poolData.poolAddress,
         rewardMint: poolData.rewardMint,
