@@ -6,7 +6,7 @@ import idlData from '../idl/simple_staking.json';
 
 // Program ID as a PublicKey
 export const PROGRAM_ID: PublicKey = pk(
-  process.env.NEXT_PUBLIC_PROGRAM_ID || "8eY8x8TAAHkFsN9w42Z85PqBr5kkJRGTyQKQA1qP2WvJ"
+  process.env.NEXT_PUBLIC_PROGRAM_ID || ""
 );
 
 export async function loadProgram(provider: AnchorProvider) {
