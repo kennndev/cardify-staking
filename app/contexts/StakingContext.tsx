@@ -7,7 +7,7 @@ import { AnchorProvider } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import BN from 'bn.js';
 
-import { CONTRACT_CONFIG } from '../config/env';
+import { CONTRACT_CONFIG, ENV } from '../config/env';
 
 
 // loadProgram gives us a Program built from on-chain IDL or local fallback;
@@ -255,9 +255,9 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       console.log('🔍 Auto-detecting pool...');
       
       // Try to find the pool by checking common staking mints
-      // For now, we'll use a hardcoded mint, but this could be made configurable
+      // Now using environment variable for auto-detection
       const commonStakingMints = [
-        '8AzxGFi1MbAxv2t7KHUWPUgYKvR641UTD6hMDFXfAy77', // Your current mint
+        ENV.PROGRAM_ID, // Auto-detect mint from environment
         // Add more common mints here if needed
       ];
       
