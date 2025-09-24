@@ -10,7 +10,7 @@ interface IdlWithAddress extends Idl {
 
 // Provide these from env/config
 export const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com";
-export const PROGRAM_ID = new PublicKey("8eY8x8TAAHkFsN9w42Z85PqBr5kkJRGTyQKQA1qP2WvJ");
+export const PROGRAM_ID = new PublicKey("64vdAWZhKCV3fbmWGrZ6QtJG8c3wGEaQThqxV5xxNmCo");
 
 // 1) Try to fetch IDL from chain. 2) else require local file.
 export async function loadProgram(provider: AnchorProvider): Promise<Program> {
