@@ -13,7 +13,7 @@ import { useStaking } from './contexts/StakingContext';
 export default function Home() {
   const [activeSection, setActiveSection] = useState('DASHBOARD');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { poolData } = useStaking();
+  const { poolData, userData } = useStaking();
 
   // Helper function to format token amounts (assuming 9 decimals like SOL)
   const formatTokenAmount = (amount: number, decimals: number = 9) => {
@@ -108,11 +108,32 @@ export default function Home() {
                   {/* Horizontal Bar Chart */}
                   <div className="space-y-4">
                     {[
-                      { label: 'TOTAL STAKED', value: 85, color: 'bg-pink-500' },
-                      { label: 'REWARD RATE', value: 72, color: 'bg-purple-500' },
-                      { label: 'POOL HEALTH', value: 95, color: 'bg-teal-500' },
-                      { label: 'ACTIVE USERS', value: 78, color: 'bg-blue-500' },
-                      { label: 'APY ESTIMATE', value: 68, color: 'bg-green-500' }
+                      { 
+                        label: 'TOTAL STAKED', 
+                        value: poolData ? Math.min(100, (poolData.totalStaked / 1e9) / 1000 * 100) : 0, 
+                        color: 'bg-pink-500' 
+                      },
+                      { 
+                        label: 'REWARD RATE', 
+                        value: poolData ? Math.min(100, poolData.ratePerSec / 1000 * 100) : 0, 
+                        color: 'bg-purple-500' 
+                      },
+                      { 
+                        label: 'POOL HEALTH', 
+                        value: poolData && poolData.totalStaked > 0 ? 95 : 0, 
+                        color: 'bg-teal-500' 
+                      },
+                      { 
+                        label: 'ACTIVE USERS', 
+                        value: poolData && poolData.totalStaked > 0 ? 78 : 0, 
+                        color: 'bg-blue-500' 
+                      },
+                      { 
+                        label: 'APY ESTIMATE', 
+                        value: poolData && poolData.totalStaked > 0 ? 
+                          Math.min(100, ((poolData.ratePerSec * 31536000) / poolData.totalStaked) * 100) : 0, 
+                        color: 'bg-green-500' 
+                      }
                     ].map((item, index) => (
                       <div key={index} className="space-y-2">
                         <div className="flex justify-between text-sm">
@@ -145,7 +166,9 @@ export default function Home() {
                   </div>
                   
                   <div className="text-center">
-                    <div className="text-6xl font-bold text-white mb-4">90</div>
+                    <div className="text-6xl font-bold text-white mb-4">
+                      {poolData ? (poolData.totalStaked / 1e9).toFixed(0) : '0'}
+                    </div>
                     <div className="text-sm text-gray-300 mb-6">TOKENS STAKED</div>
                     
                     {/* Waveform Chart */}
@@ -191,21 +214,29 @@ export default function Home() {
                     <div className="absolute inset-0 rounded-full border-8 border-orange-500 border-t-0 border-r-0"></div>
                     <div className="absolute inset-0 rounded-full border-8 border-purple-500 border-t-0 border-r-0 border-b-0"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">+0.1K</span>
+                      <span className="text-white font-bold text-sm">
+                        {userData ? `+${(userData.staked / 1e9).toFixed(1)}K` : '+0K'}
+                      </span>
                     </div>
                   </div>
                   
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-300">90 total</span>
+                      <span className="text-gray-300">
+                        {poolData ? (poolData.totalStaked / 1e9).toFixed(1) : '0'} total
+                      </span>
                       <span className="text-teal-400">●</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-300">90 your stake</span>
+                      <span className="text-gray-300">
+                        {userData ? (userData.staked / 1e9).toFixed(1) : '0'} your stake
+                      </span>
                       <span className="text-pink-400">●</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-300">0/sec rate</span>
+                      <span className="text-gray-300">
+                        {poolData ? poolData.ratePerSec.toFixed(0) : '0'}/sec rate
+                      </span>
                       <span className="text-orange-400">●</span>
                     </div>
                   </div>
@@ -270,13 +301,17 @@ export default function Home() {
                     <div className="absolute inset-2 rounded-full border-4 border-yellow-500"></div>
                     <div className="absolute inset-4 rounded-full border-4 border-teal-500"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">0.1K</span>
+                      <span className="text-white font-bold text-sm">
+                        {poolData ? `${(poolData.totalStaked / 1e9).toFixed(1)}K` : '0K'}
+                      </span>
                     </div>
                   </div>
                   
                   <div className="text-center">
                     <div className="text-xs text-gray-300">Pool Health</div>
-                    <div className="text-xs text-green-400">0.1%</div>
+                    <div className="text-xs text-green-400">
+                      {poolData && poolData.totalStaked > 0 ? '100%' : '0%'}
+                    </div>
                   </div>
                 </div>
 
@@ -296,22 +331,32 @@ export default function Home() {
                   
                   {/* Token Info Display */}
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-white mb-2">8Azx</div>
-                    <div className="text-sm text-gray-300 mb-4">8Azx...Ay77</div>
+                    <div className="text-2xl font-bold text-white mb-2">
+                      {poolData ? poolData.stakingMint.slice(0, 4) : 'N/A'}
+                    </div>
+                    <div className="text-sm text-gray-300 mb-4">
+                      {poolData ? `${poolData.stakingMint.slice(0, 4)}...${poolData.stakingMint.slice(-4)}` : 'No token'}
+                    </div>
                     
                     {/* Token Stats */}
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-gray-300">Total Supply:</span>
-                        <span className="text-white">90</span>
+                        <span className="text-gray-300">Total Staked:</span>
+                        <span className="text-white">
+                          {poolData ? (poolData.totalStaked / 1e9).toFixed(1) : '0'}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-300">Your Stake:</span>
-                        <span className="text-white">90</span>
+                        <span className="text-white">
+                          {userData ? (userData.staked / 1e9).toFixed(1) : '0'}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-300">Rate:</span>
-                        <span className="text-white">0/sec</span>
+                        <span className="text-white">
+                          {poolData ? `${poolData.ratePerSec}/sec` : '0/sec'}
+                        </span>
                       </div>
                     </div>
                   </div>
