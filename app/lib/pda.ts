@@ -30,13 +30,13 @@ export function poolPda(programId: string | PublicKey, stakingMint: string | Pub
   return PublicKey.findProgramAddressSync([Buffer.from("pool"), mint.toBuffer()], pid)[0];
 }
 
-/** signer = PDA("signer", pool) - legacy seed for existing pools */
+/** signer = PDA("pool-signer", pool) - exact seed the Rust program uses */
 export function signerPda(programId: string | PublicKey, pool: string | PublicKey): PublicKey {
   const pid = pk(programId);
   const poolPk = pk(pool);
   
-  // Use legacy seed for existing pools
-  return PublicKey.findProgramAddressSync([Buffer.from("signer"), poolPk.toBuffer()], pid)[0];
+  // Use exact same seed the Rust code uses (with hyphen)
+  return PublicKey.findProgramAddressSync([Buffer.from("pool-signer"), poolPk.toBuffer()], pid)[0];
 }
 
 /** Legacy helper for old pools that were initialized with "signer" seed */
