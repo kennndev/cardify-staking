@@ -9,7 +9,7 @@ export const ENV = {
   NETWORK: process.env.NEXT_PUBLIC_NETWORK || 'devnet',
   
   // Token Configuration
-  STAKING_MINT: process.env.NEXT_PUBLIC_STAKING_MINT || '', // SOL
+  STAKING_MINT: process.env.NEXT_PUBLIC_STAKING_MINT || '2VkcySsgoVMitU7wo81qqGD1QBPX1Bi3ziPVvQXwyMGY', // Your staking token
   REWARD_MINT: process.env.NEXT_PUBLIC_REWARD_MINT || '', // USDC
   
   // App Configuration
