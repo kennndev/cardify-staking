@@ -638,8 +638,8 @@ export function StakingProvider({ children }: { children: ReactNode }) {
                  admin: pk(walletAddress),
                })
                .rpc({ 
-                 skipPreflight: true, 
-                 commitment: 'confirmed'
+                 commitment: 'confirmed',
+                 preflightCommitment: 'processed'
                });
 
              console.log('✅ setRewardRate tx:', sig);
@@ -1062,8 +1062,8 @@ export function StakingProvider({ children }: { children: ReactNode }) {
             rent: SYSVAR_RENT_PUBKEY,
           })
           .rpc({ 
-            skipPreflight: true, 
-            commitment: 'confirmed'
+            commitment: 'confirmed',
+            preflightCommitment: 'processed'
           });
         
         console.log('✅ Stake transaction successful:', tx);
@@ -1216,8 +1216,8 @@ export function StakingProvider({ children }: { children: ReactNode }) {
             tokenProgram: TOKEN_PROGRAM_ID,
           })
           .rpc({ 
-            skipPreflight: true, 
-            commitment: 'confirmed'
+            commitment: 'confirmed',
+            preflightCommitment: 'processed'
           });
         
         console.log('✅ Unstake transaction successful:', tx);
