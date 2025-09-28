@@ -30,10 +30,56 @@ export function poolPda(programId: string | PublicKey, stakingMint: string | Pub
   return PublicKey.findProgramAddressSync([Buffer.from("pool"), mint.toBuffer()], pid)[0];
 }
 
-/** signer = PDA("pool_signer", pool) */
+/** signer = PDA("pool_signer", pool) - with legacy fallback */
 export function signerPda(programId: string | PublicKey, pool: string | PublicKey): PublicKey {
   const pid = pk(programId);
   const poolPk = pk(pool);
+  
+  // Try new seed first (for new pools)
+  return PublicKey.findProgramAddressSync([Buffer.from("pool_signer"), poolPk.toBuffer()], pid)[0];
+}
+
+/** Legacy helper for old pools that were initialized with "signer" seed */
+export function signerPdaLegacy(programId: string | PublicKey, pool: string | PublicKey): PublicKey {
+  const pid = pk(programId);
+  const poolPk = pk(pool);
+  return PublicKey.findProgramAddressSync([Buffer.from("signer"), poolPk.toBuffer()], pid)[0];
+}
+
+/** Smart signer PDA that detects which seed to use based on pool data */
+export function signerPdaSmart(
+  programId: string | PublicKey, 
+  pool: string | PublicKey, 
+  poolData?: { signerBump?: number }
+): PublicKey {
+  const pid = pk(programId);
+  const poolPk = pk(pool);
+  
+  // If we have pool data with signerBump, we can determine which seed was used
+  if (poolData?.signerBump !== undefined) {
+    // Try new seed first
+    const [newAddr, newBump] = PublicKey.findProgramAddressSync(
+      [Buffer.from("pool_signer"), poolPk.toBuffer()],
+      pid
+    );
+    
+    // If the bump matches, use the new seed
+    if (newBump === poolData.signerBump) {
+      return newAddr;
+    }
+    
+    // Otherwise, try legacy seed
+    const [legacyAddr, legacyBump] = PublicKey.findProgramAddressSync(
+      [Buffer.from("signer"), poolPk.toBuffer()],
+      pid
+    );
+    
+    if (legacyBump === poolData.signerBump) {
+      return legacyAddr;
+    }
+  }
+  
+  // Default to new seed (for new pools)
   return PublicKey.findProgramAddressSync([Buffer.from("pool_signer"), poolPk.toBuffer()], pid)[0];
 }
 
