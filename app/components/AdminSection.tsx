@@ -1,14 +1,100 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import { useStaking } from '../contexts/StakingContext';
+import { TicketService, Ticket, TicketMessage } from '../lib/supabase';
+import TicketList from './TicketList';
+import WalletAddress from './WalletAddress';
 
 export default function AdminSection() {
-  const { isAdmin, poolData, isLoading, error, initializePool, fetchPoolByMint, setRewardConfig, addRewardTokens } = useStaking();
-  const [stakingMint, setStakingMint] = useState('');
+  const { isAdmin, poolData, isLoading, error, stakingMint, initializePool, fetchPoolByMint, setStakingMint, setRewardConfig, addRewardTokens, setRewardRate } = useStaking();
+  const [stakingMintInput, setStakingMintInput] = useState('');
   const [rewardMint, setRewardMint] = useState('');
   const [ratePerSec, setRatePerSec] = useState('');
   const [rewardAmount, setRewardAmount] = useState('');
+  const [newRewardRate, setNewRewardRate] = useState('');
+  
+  // Ticket management state
+  const [allTickets, setAllTickets] = useState<Ticket[]>([]);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [ticketMessages, setTicketMessages] = useState<TicketMessage[]>([]);
+  const [adminReply, setAdminReply] = useState('');
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+
+  // Load all tickets on component mount
+  useEffect(() => {
+    if (isAdmin) {
+      loadAllTickets();
+    }
+  }, [isAdmin]);
+
+  const loadAllTickets = async () => {
+    setTicketsLoading(true);
+    setTicketsError(null);
+    
+    try {
+      const tickets = await TicketService.getAllTickets();
+      setAllTickets(tickets);
+    } catch (err) {
+      console.error('Error loading tickets:', err);
+      setTicketsError('Failed to load tickets. Please try again.');
+    } finally {
+      setTicketsLoading(false);
+    }
+  };
+
+  const loadTicketMessages = async (ticketId: string) => {
+    try {
+      const messages = await TicketService.getTicketMessages(ticketId);
+      setTicketMessages(messages);
+    } catch (err) {
+      console.error('Error loading ticket messages:', err);
+      setTicketsError('Failed to load ticket messages.');
+    }
+  };
+
+  const handleTicketSelect = useCallback(async (ticket: Ticket) => {
+    setSelectedTicket(ticket);
+    await loadTicketMessages(ticket.id);
+  }, []);
+
+  const handleAdminReply = async () => {
+    if (!selectedTicket || !adminReply.trim()) return;
+
+    setTicketsLoading(true);
+    setTicketsError(null);
+
+    try {
+      await TicketService.addAdminResponse(
+        selectedTicket.id,
+        adminReply,
+        'Admin' // You can use the actual admin wallet address here
+      );
+
+      // Reload messages
+      await loadTicketMessages(selectedTicket.id);
+      setAdminReply('');
+    } catch (err) {
+      console.error('Error sending admin reply:', err);
+      setTicketsError('Failed to send reply. Please try again.');
+    } finally {
+      setTicketsLoading(false);
+    }
+  };
+
+  const handleUpdateTicketStatus = async (ticketId: string, status: 'open' | 'in-progress' | 'resolved' | 'closed') => {
+    try {
+      await TicketService.updateTicketStatus(ticketId, status);
+      await loadAllTickets(); // Refresh the tickets list
+      if (selectedTicket && selectedTicket.id === ticketId) {
+        setSelectedTicket({ ...selectedTicket, status });
+      }
+    } catch (err) {
+      console.error('Error updating ticket status:', err);
+      setTicketsError('Failed to update ticket status.');
+    }
+  };
 
   if (!isAdmin) {
     return (
@@ -24,9 +110,9 @@ export default function AdminSection() {
   const handleInitialize = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await initializePool(stakingMint);
+      await initializePool(stakingMintInput);
       alert('Pool initialized successfully!');
-      setStakingMint('');
+      setStakingMintInput('');
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
@@ -47,23 +133,58 @@ export default function AdminSection() {
   const handleAddRewardTokens = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      console.log('🔄 Adding reward tokens...');
       await addRewardTokens(parseFloat(rewardAmount));
+      console.log('✅ Reward tokens added successfully!');
       alert('Reward tokens added successfully!');
       setRewardAmount('');
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('❌ Failed to add reward tokens:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      
+      if (errorMessage.includes('already been processed')) {
+        alert('Transaction was already processed. Please refresh the page and check if tokens were added.');
+      } else if (errorMessage.includes('wait a few seconds')) {
+        alert('Please wait a few seconds before submitting another transaction.');
+      } else {
+        alert(`Error: ${errorMessage}`);
+      }
     }
   };
 
 
   const handleFetchPool = async () => {
-    if (!stakingMint) {
+    if (!stakingMintInput) {
       alert('Please enter a staking mint address first');
       return;
     }
     try {
-      await fetchPoolByMint(stakingMint);
+      await fetchPoolByMint(stakingMintInput);
       alert('Pool data fetched successfully!');
+    } catch (err) {
+      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleSetStakingMint = async () => {
+    if (!stakingMintInput) {
+      alert('Please enter a staking mint address first');
+      return;
+    }
+    try {
+      setStakingMint(stakingMintInput);
+      alert('Staking mint set successfully!');
+    } catch (err) {
+      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleSetRewardRate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await setRewardRate(parseFloat(newRewardRate));
+      alert('Reward rate updated successfully!');
+      setNewRewardRate('');
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
@@ -81,6 +202,35 @@ export default function AdminSection() {
           <p className="text-red-300">{error}</p>
         </div>
       )}
+
+      {/* Current Staking Mint */}
+      <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold text-white mb-4">Current Staking Mint</h2>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-300">Current Mint:</span>
+            <span className="text-white font-medium">
+              {stakingMint ? `${stakingMint.slice(0, 8)}...${stakingMint.slice(-8)}` : 'Not Set'}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={stakingMintInput}
+              onChange={(e) => setStakingMintInput(e.target.value)}
+              className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter new staking mint address"
+            />
+            <button
+              onClick={handleSetStakingMint}
+              disabled={isLoading || !stakingMintInput}
+              className="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
+            >
+              Set Mint
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Pool Status */}
@@ -122,8 +272,8 @@ export default function AdminSection() {
               <label className="block text-gray-300 text-sm mb-2">Staking Mint Address</label>
               <input
                 type="text"
-                value={stakingMint}
-                onChange={(e) => setStakingMint(e.target.value)}
+                value={stakingMintInput}
+                onChange={(e) => setStakingMintInput(e.target.value)}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter staking token mint address"
                 required
@@ -140,7 +290,7 @@ export default function AdminSection() {
               <button
                 type="button"
                 onClick={handleFetchPool}
-                disabled={isLoading || !stakingMint}
+                disabled={isLoading || !stakingMintInput}
                 className="flex-1 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
               >
                 {isLoading ? 'Loading...' : 'Fetch Pool'}
@@ -179,8 +329,8 @@ export default function AdminSection() {
                     Example: 0.000001 = 1 token per 1,000,000 seconds ≈ 0.0864 tokens/day
                   </p>
                 </div>
-                <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3">
-                  <div className="text-sm text-blue-300">
+                <div className="bg-blue-600/20 border border-blue-500/50 rounded-lg p-3">
+                  <div className="text-sm text-white">
                     <strong>APY Calculation:</strong> {ratePerSec ? `${(parseFloat(ratePerSec) * 31536000).toFixed(6)}%` : '0%'} annual rate
                   </div>
                 </div>
@@ -194,38 +344,58 @@ export default function AdminSection() {
               </form>
             </div>
 
-            {/* Update Rate - DISABLED */}
-            <div className="bg-red-500/20 backdrop-blur-sm border border-red-500/50 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">⚠️ Update Rate (Not Available)</h2>
+            {/* Update Rate */}
+            <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">⚡ Update Reward Rate</h2>
               <div className="space-y-4">
-                <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3">
-                  <div className="text-sm text-red-300">
-                    <strong>Issue:</strong> updateRate instruction not available in current program
+                <div className="bg-blue-600/20 border border-blue-500/50 rounded-lg p-3">
+                  <div className="text-sm text-white">
+                    <strong>Current Rate:</strong> {poolData?.ratePerSec || 0} base units/sec = {(poolData?.ratePerSec || 0) / Math.pow(10, 6)} tokens/sec
                   </div>
-                  <div className="text-sm text-red-300 mt-2">
-                    <strong>Solution:</strong> Use a different staking mint to create a new pool
-                  </div>
-                </div>
-                <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3">
-                  <div className="text-sm text-blue-300">
-                    <strong>Current Rate:</strong> {poolData?.ratePerSec || 0} per second
-                  </div>
-                  <div className="text-sm text-blue-300">
+                  <div className="text-sm text-white">
                     <strong>Current APY:</strong> {poolData?.ratePerSec && poolData.ratePerSec > 0 ? 
                       `${((poolData.ratePerSec * 31536000) / (poolData.totalStaked || 1) * 100).toFixed(6)}%` : 
                       '0% (rate is 0)'
                     }
                   </div>
                 </div>
-                <button
-                  disabled={true}
-                  className="w-full bg-gray-500 text-white font-medium py-2 px-4 rounded-lg cursor-not-allowed"
-                >
-                  Update Rate (Not Available)
-                </button>
-                <p className="text-red-400 text-sm">
-                  To fix this, use a different staking mint in &quot;Initialize Pool&quot; section
-                </p>
+                <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3">
+                  <div className="text-sm text-yellow-300">
+                    <strong>💡 Quick Rate Suggestions:</strong>
+                  </div>
+                  <div className="text-sm text-yellow-300 mt-1">
+                    • <strong>0.5 tokens/sec</strong> = Good for testing (high rewards)
+                  </div>
+                  <div className="text-sm text-yellow-300">
+                    • <strong>0.01 tokens/sec</strong> = Moderate rewards
+                  </div>
+                  <div className="text-sm text-yellow-300">
+                    • <strong>0.001 tokens/sec</strong> = Low rewards (current: 0.0001)
+                  </div>
+                </div>
+                <form onSubmit={handleSetRewardRate} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      New Reward Rate (per second)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      value={newRewardRate}
+                      onChange={(e) => setNewRewardRate(e.target.value)}
+                      className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter new reward rate per second"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
+                  >
+                    {isLoading ? 'Updating...' : 'Update Reward Rate'}
+                  </button>
+                </form>
               </div>
             </div>
 
@@ -248,8 +418,8 @@ export default function AdminSection() {
                     This will transfer tokens from your wallet to the reward vault
                   </p>
                 </div>
-                <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-3">
-                  <div className="text-sm text-green-300">
+                <div className="bg-blue-600/20 border border-blue-500/50 rounded-lg p-3">
+                  <div className="text-sm text-white">
                     <strong>Current Reward Mint:</strong> {poolData?.rewardMint ?
                       `${poolData.rewardMint.slice(0, 8)}...${poolData.rewardMint.slice(-8)}` :
                       'Not set'
@@ -271,6 +441,135 @@ export default function AdminSection() {
               </form>
             </div>
           </div>
+
+      {/* Support Tickets Management */}
+      <div className="mt-8">
+        <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-semibold text-white">Support Tickets Management</h2>
+            <button
+              onClick={loadAllTickets}
+              disabled={ticketsLoading}
+              className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-all duration-200"
+            >
+              {ticketsLoading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+
+          {ticketsError && (
+            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 mb-4">
+              <p className="text-red-300 text-sm">{ticketsError}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+            {/* Tickets List */}
+            <div className="bg-white/5 border border-white/10 rounded-lg p-3 sm:p-4">
+              <h3 className="text-lg font-semibold text-white mb-4">All Tickets ({allTickets.length})</h3>
+              <TicketList
+                tickets={allTickets}
+                onTicketSelect={handleTicketSelect}
+                selectedTicket={selectedTicket}
+                isLoading={ticketsLoading}
+              />
+            </div>
+
+            {/* Ticket Details */}
+            <div className="bg-white/5 border border-white/10 rounded-lg p-3 sm:p-4">
+              {selectedTicket ? (
+                <div>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 space-y-2 sm:space-y-0">
+                    <h3 className="text-lg font-semibold text-white">Ticket Details</h3>
+                    <div className="flex space-x-2">
+                      <select
+                        value={selectedTicket.status}
+                        onChange={(e) => handleUpdateTicketStatus(selectedTicket.id, e.target.value as any)}
+                        className="bg-black/50 border border-white/20 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
+                      >
+                        <option value="open">Open</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <h4 className="text-white font-medium">{selectedTicket.subject}</h4>
+                    <p className="text-sm text-gray-300 mt-1">{selectedTicket.description}</p>
+                    <div className="text-xs text-gray-400 mt-2 break-long-text overflow-hidden">
+                      <span className="text-gray-400">From: </span>
+                      <WalletAddress address={selectedTicket.wallet_address} className="text-blue-400 hover:text-blue-300" />
+                    </div>
+                  </div>
+
+                  {/* Messages */}
+                  <div className="mb-4">
+                    <h5 className="text-white font-medium mb-2">Messages</h5>
+                    <div className="bg-black/20 rounded-lg p-3 max-h-48 overflow-y-auto">
+                      <div className="space-y-3">
+                        {ticketMessages.map((message) => (
+                          <div
+                            key={message.id}
+                            className={`flex ${message.is_user ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg px-3 py-2 rounded-lg break-words ${
+                                message.is_user
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-white/10 text-gray-100'
+                              }`}
+                            >
+                              <p className="text-sm break-words">{message.message_text}</p>
+                              <p className="text-xs opacity-70 mt-1 break-words">
+                                {message.sender.length > 20 ? `${message.sender.slice(0, 8)}...${message.sender.slice(-8)}` : message.sender} • {new Date(message.created_at).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Admin Reply */}
+                  <div>
+                    <h5 className="text-white font-medium mb-2">Admin Reply</h5>
+                    {selectedTicket.status === 'closed' ? (
+                      <div className="bg-gray-600/20 border border-gray-500/50 rounded-lg p-4 text-center">
+                        <p className="text-gray-400 text-sm">
+                          This ticket is closed. Admin replies are disabled.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                        <input
+                          type="text"
+                          value={adminReply}
+                          onChange={(e) => setAdminReply(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleAdminReply()}
+                          placeholder="Type your response..."
+                          className="flex-1 bg-black/50 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={handleAdminReply}
+                          disabled={!adminReply.trim() || ticketsLoading}
+                          className="bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-all duration-200 w-full sm:w-auto"
+                        >
+                          {ticketsLoading ? 'Sending...' : 'Send'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-400">Select a ticket to view details</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
+    </div>
   );
 }

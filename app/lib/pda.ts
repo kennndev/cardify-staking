@@ -1,8 +1,27 @@
 import { PublicKey } from "@solana/web3.js";
 
 /** Coerce any base58 string or PublicKey into a PublicKey */
-export const pk = (x: string | PublicKey): PublicKey =>
-  x instanceof PublicKey ? x : new PublicKey(x);
+export const pk = (x: string | PublicKey | null | undefined): PublicKey => {
+  if (x instanceof PublicKey) {
+    return x;
+  }
+  
+  // Handle null/undefined
+  if (!x) {
+    throw new Error('PublicKey is null or undefined. Please ensure wallet is connected.');
+  }
+  
+  // Handle empty or placeholder strings
+  if (typeof x === 'string' && (x.trim() === '' || x.includes('your_') || x.includes('_here'))) {
+    throw new Error(`Invalid or placeholder PublicKey: ${x}. Please set proper environment variables.`);
+  }
+  
+  try {
+    return new PublicKey(x);
+  } catch (error) {
+    throw new Error(`Invalid PublicKey format: ${x}. Expected a valid base58 string.`);
+  }
+};
 
 /** pool = PDA("pool", staking_mint) */
 export function poolPda(programId: string | PublicKey, stakingMint: string | PublicKey): PublicKey {

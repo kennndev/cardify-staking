@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStaking } from '../contexts/StakingContext';
 
 export default function StakingPage() {
-  const { walletAddress, poolData, userData, isLoading, error, stake, unstake, claim, refreshData } = useStaking();
+  const { walletAddress, poolData, userData, isLoading, error, stake, unstake, claim, refreshData, stakingDecimals, rewardDecimals } = useStaking();
   const [stakeAmount, setStakeAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
 
@@ -54,15 +54,67 @@ export default function StakingPage() {
     }
   };
 
-  const calculatePendingRewards = () => {
-    if (!userData || !poolData) return 0;
-    // Simplified calculation - in reality you'd use the contract's pending_rewards function
-    return Math.floor(userData.staked * 0.1); // Placeholder calculation
+  // Constants for reward calculation
+  const SCALAR_BI = BigInt(1_000_000_000_000);
+
+  const computePending = ({
+    pool,
+    user,
+    nowSecs
+  }: {
+    pool: { accScaled: string; lastUpdateTs: number; ratePerSec: number; totalStaked: number };
+    user: { staked: number; debt: string; unpaidRewards: string };
+    nowSecs: number;
+  }) => {
+    if (!pool || !user || pool.totalStaked === 0) return BigInt(0);
+
+    const accScaled = BigInt(pool.accScaled ?? "0");
+    const debt = BigInt(user.debt ?? "0");
+    const unpaid = BigInt(user.unpaidRewards ?? "0");
+    const staked = BigInt(user.staked ?? 0);
+
+    const dt = BigInt(Math.max(0, nowSecs - (pool.lastUpdateTs ?? nowSecs)));
+    const rate = BigInt(pool.ratePerSec ?? 0);
+    const totalStaked = BigInt(pool.totalStaked ?? 0);
+
+    // head-of-line accumulator: accScaled + (rate * dt / totalStaked) * SCALAR
+    const accHead = accScaled + (rate * dt * SCALAR_BI) / (totalStaked === BigInt(0) ? BigInt(1) : totalStaked);
+
+    // pending = unpaid + staked * (accHead - debt) / SCALAR
+    const delta = accHead > debt ? accHead - debt : BigInt(0);
+    const pending = unpaid + (staked * delta) / SCALAR_BI;
+
+    return pending; // base units of reward mint
   };
 
-  // Helper function to format token amounts (assuming 9 decimals like SOL)
-  const formatTokenAmount = (amount: number, decimals: number = 9) => {
-    return (amount / Math.pow(10, decimals)).toFixed(6);
+  const calculatePendingRewards = () => {
+    if (!userData || !poolData) return 0;
+    
+    const now = Math.floor(Date.now() / 1000);
+    const rawPending = computePending({
+      pool: {
+        accScaled: poolData.accScaled,
+        lastUpdateTs: poolData.lastUpdateTs,
+        ratePerSec: poolData.ratePerSec,
+        totalStaked: poolData.totalStaked,
+      },
+      user: {
+        staked: userData.staked,
+        debt: userData.debt,
+        unpaidRewards: userData.unpaidRewards,
+      },
+      nowSecs: now,
+    });
+
+    // Convert to UI using the reward mint decimals
+    return rewardDecimals > 0 
+      ? Number(rawPending) / Math.pow(10, rewardDecimals)
+      : Number(rawPending);
+  };
+
+  // Helper function to format token amounts using dynamic decimals
+  const formatTokenAmount = (amount: number, decimals: number = stakingDecimals) => {
+    return (amount / Math.pow(10, decimals)).toFixed(0);
   };
 
 

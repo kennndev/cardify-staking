@@ -166,3 +166,45 @@ textarea:focus-visible {
     font-size: 16px;
   }
 }
+
+/* Custom dark theme styles for form elements */
+select {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  color: white !important;
+}
+
+select option {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  color: white !important;
+}
+
+/* Ensure input fields have dark backgrounds */
+input[type="text"], 
+input[type="email"], 
+input[type="password"], 
+input[type="number"],
+textarea {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  color: white !important;
+}
+
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder,
+input[type="number"]::placeholder,
+textarea::placeholder {
+  color: rgb(156, 163, 175) !important;
+}
+
+/* Wallet address overflow handling */
+.wallet-address {
+  word-break: break-all;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Ensure long text wraps properly */
+.break-long-text {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStaking } from '../contexts/StakingContext';
 
 export default function AdminPage() {
-  const { isAdmin, poolData, isLoading, error, initializePool, addRewardTokens, updateRate, setRewardConfig } = useStaking();
+  const { isAdmin, poolData, isLoading, error, initializePool, addRewardTokens, setRewardRate, setRewardConfig } = useStaking();
   const [stakingMint, setStakingMint] = useState('');
   const [rewardMint, setRewardMint] = useState('');
   const [rewardRate, setRewardRateInput] = useState('');
@@ -49,7 +49,7 @@ export default function AdminPage() {
   const handleSetRewardRate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateRate(parseFloat(newRewardRate));
+      await setRewardRate(parseFloat(newRewardRate));
       alert('Reward rate updated successfully!');
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);

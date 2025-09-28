@@ -1,27 +1,40 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStaking } from '../contexts/StakingContext';
 import PoolSelector from './PoolSelector';
+import { formatToken } from '../utils/format';
 
 export default function StakingSection() {
-  const { walletAddress, poolData, userData, isLoading, error, stake, unstake, claim, refreshData } = useStaking();
+  const { walletAddress, poolData, userData, isLoading, error, stake, unstake, claim, refreshData, stakingDecimals, rewardDecimals, connection } = useStaking();
+  
+  // Helper function to format token amounts using dynamic decimals
+  const formatTokenAmount = (amount: number, decimals: number = stakingDecimals) => {
+    return formatToken(amount, decimals, 0, 0); // No decimals for staked amounts
+  };
   const [stakeAmount, setStakeAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
+  const [currentTime, setCurrentTime] = useState(Math.floor(Date.now() / 1000));
 
-  // Debug logging
-  console.log('StakingSection state:', {
-    walletAddress,
-    poolData: poolData ? 'Available' : 'Not available',
-    userData: userData ? 'Available' : 'Not available',
-    isLoading,
-    error
-  });
+  // Update time every second for real-time pending rewards
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Math.floor(Date.now() / 1000));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
 
   const handleStake = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!walletAddress) {
       alert('Please connect your wallet first');
+      return;
+    }
+    
+    if (isLoading) {
+      console.log('⚠️ Transaction already in progress, ignoring click');
       return;
     }
     
@@ -41,6 +54,11 @@ export default function StakingSection() {
       return;
     }
     
+    if (isLoading) {
+      console.log('⚠️ Transaction already in progress, ignoring click');
+      return;
+    }
+    
     try {
       await unstake(parseFloat(unstakeAmount));
       alert('Unstaked successfully!');
@@ -56,6 +74,11 @@ export default function StakingSection() {
       return;
     }
     
+    if (isLoading) {
+      console.log('⚠️ Transaction already in progress, ignoring click');
+      return;
+    }
+    
     try {
       await claim();
       alert('Rewards claimed successfully!');
@@ -64,10 +87,129 @@ export default function StakingSection() {
     }
   };
 
-  const calculatePendingRewards = () => {
+  const handleRefreshData = async () => {
+    if (!walletAddress) {
+      alert('Please connect your wallet first');
+      return;
+    }
+    
+    try {
+      console.log('🔄 Manually refreshing data...');
+      await refreshData();
+      console.log('✅ Data refreshed');
+    } catch (err) {
+      console.error('❌ Failed to refresh data:', err);
+      alert(`Error refreshing data: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleCheckRewardBalance = async () => {
+    if (!walletAddress || !poolData) {
+      alert('Please connect your wallet and ensure pool is loaded');
+      return;
+    }
+    
+    try {
+      const { getAssociatedTokenAddress } = await import('@solana/spl-token');
+      const { PublicKey } = await import('@solana/web3.js');
+      
+      const userRewardAta = await getAssociatedTokenAddress(
+        new PublicKey(poolData.rewardMint),
+        new PublicKey(walletAddress)
+      );
+      
+      const balance = await connection.getTokenAccountBalance(userRewardAta);
+      const uiAmount = Number(balance.value.amount) / Math.pow(10, rewardDecimals);
+      
+      console.log('💰 Current reward balance:', {
+        baseUnits: balance.value.amount,
+        uiAmount: uiAmount,
+        decimals: rewardDecimals
+      });
+      
+      alert(`Current reward balance: ${uiAmount.toFixed(8)} tokens`);
+    } catch (err) {
+      console.error('❌ Failed to check reward balance:', err);
+      alert(`Error checking balance: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+
+
+  // Constants for reward calculation
+  // !!! matches the existing on-chain state (1e12 precision) !!!
+  const SCALAR_BI = BigInt(1_000_000_000_000);  // 1e12 - matches deployed contract
+  
+  // TODO: Future improvement - derive from IDL to prevent drift:
+  // const accPrecisionFromIdl = BigInt(
+  //   program.idl.constants?.find(c => c.name === 'ACC_PRECISION')?.value ?? '1000000000000'
+  // );
+  // const SCALAR_BI = accPrecisionFromIdl;
+
+  const computePending = ({
+    pool,
+    user,
+    nowSecs
+  }: {
+    pool: { accScaled: string; lastUpdateTs: number; ratePerSec: number; totalStaked: number };
+    user: { staked: number; debt: string; unpaidRewards: string };
+    nowSecs: number;
+  }) => {
+    if (!pool || !user || pool.totalStaked === 0) return BigInt(0);
+
+    const accScaled = BigInt(pool.accScaled ?? "0");
+    const debt = BigInt(user.debt ?? "0");
+    const unpaid = BigInt(user.unpaidRewards ?? "0");
+    const staked = BigInt(user.staked ?? 0);
+
+    const dt = BigInt(Math.max(0, nowSecs - (pool.lastUpdateTs ?? nowSecs)));
+    const rate = BigInt(pool.ratePerSec ?? 0);
+    const totalStaked = BigInt(pool.totalStaked ?? 0);
+
+
+    // head-of-line accumulator: accScaled + (rate * dt / totalStaked) * SCALAR
+    const accHead = accScaled + (rate * dt * SCALAR_BI) / (totalStaked === BigInt(0) ? BigInt(1) : totalStaked);
+
+    // CORRECTED: reward part that belongs to the user, already in base units
+    // Multiply first, then divide by SCALAR_BI
+    const earned = (staked * accHead) / SCALAR_BI;
+
+    // pending = unpaid + earned - debt (all in base units)
+    // Safety guard: prevent underflow
+    const pending = earned > debt ? unpaid + earned - debt : unpaid;
+
+
+    return pending > BigInt(0) ? pending : BigInt(0); // base units of reward mint
+  };
+
+  const calculatePendingRewards = (): number => {
     if (!userData || !poolData) return 0;
-    // Simplified calculation - in reality you'd use the contract's pending_rewards function
-    return Math.floor(userData.staked * 0.1); // Placeholder calculation
+    
+    const now = currentTime;
+    
+    // Use the corrected BigInt calculation with proper SCALAR_BI
+    const rawPending = computePending({
+      pool: {
+        accScaled: poolData.accScaled,
+        lastUpdateTs: poolData.lastUpdateTs,
+        ratePerSec: poolData.ratePerSec,
+        totalStaked: poolData.totalStaked,
+      },
+      user: {
+        staked: userData.staked,
+        debt: userData.debt,
+        unpaidRewards: userData.unpaidRewards,
+      },
+      nowSecs: now,
+    });
+
+    // Convert to UI using the reward mint decimals
+    const pendingUi = rewardDecimals > 0 
+      ? Number(rawPending) / Math.pow(10, rewardDecimals)
+      : Number(rawPending);
+    
+    
+    return pendingUi;
   };
 
   if (!walletAddress) {
@@ -104,7 +246,7 @@ export default function StakingSection() {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-300">Total Staked:</span>
-                <span className="text-white font-medium">{poolData.totalStaked.toLocaleString()}</span>
+                <span className="text-white font-medium">{formatTokenAmount(poolData.totalStaked)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Reward Rate:</span>
@@ -129,15 +271,21 @@ export default function StakingSection() {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-300">Staked Amount:</span>
-                <span className="text-white font-medium">{userData.staked.toLocaleString()}</span>
+                <span className="text-white font-medium">{formatTokenAmount(userData.staked)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Pending Rewards:</span>
-                <span className="text-green-400 font-medium">{calculatePendingRewards().toLocaleString()}</span>
+                <span className="text-green-400 font-medium">{formatToken(calculatePendingRewards() * Math.pow(10, rewardDecimals), rewardDecimals, 0, 8)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-300">Reward Debt:</span>
-                <span className="text-white font-medium">{userData.debt.toLocaleString()}</span>
+                <span className="text-gray-300 flex items-center">
+                  Rewards Already&nbsp;Counted
+                  <span className="ml-1 cursor-help" title={
+                    "Internal amount already credited to you. " +
+                    "Used to calculate new rewards accurately."
+                  }>ⓘ</span>
+                </span>
+                <span className="text-white font-medium">{formatTokenAmount(Number(userData.debt))}</span>
               </div>
             </div>
           ) : (
@@ -157,15 +305,23 @@ export default function StakingSection() {
               {isLoading ? 'Processing...' : 'Claim Rewards'}
             </button>
             <button
-              onClick={refreshData}
+              onClick={handleRefreshData}
               disabled={isLoading}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 touch-target"
             >
               {isLoading ? 'Refreshing...' : 'Refresh Data'}
             </button>
+            <button
+              onClick={handleCheckRewardBalance}
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 touch-target mt-2"
+            >
+              Check Reward Balance
+            </button>
           </div>
         </div>
       </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Stake Tokens */}

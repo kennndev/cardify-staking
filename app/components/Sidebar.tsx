@@ -7,6 +7,7 @@ const menuItems = [
   { icon: '🏠', label: 'DASHBOARD', active: true },
   { icon: '📊', label: 'TOKEN ANALYTICS', active: false },
   { icon: '💰', label: 'STAKING', active: false },
+  { icon: '🎮', label: 'GAMES', active: false },
   { icon: '👑', label: 'ADMIN', active: false },
   { icon: '💬', label: 'MESSAGES', active: false },
   { icon: '❓', label: 'SUPPORT', active: false },

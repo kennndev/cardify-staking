@@ -20,6 +20,9 @@ NEXT_PUBLIC_REWARD_MINT=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
 # App Configuration
 NEXT_PUBLIC_APP_NAME=Solana Staking Dashboard
 NEXT_PUBLIC_APP_DESCRIPTION=Professional Solana staking dashboard for monitoring and managing your staked tokens
+
+# OpenAI Configuration (for AI chatbot)
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 ## Configuration Variables
@@ -39,6 +42,9 @@ NEXT_PUBLIC_APP_DESCRIPTION=Professional Solana staking dashboard for monitoring
 ### App Configuration
 - `NEXT_PUBLIC_APP_NAME`: Application name
 - `NEXT_PUBLIC_APP_DESCRIPTION`: Application description
+
+### OpenAI Configuration
+- `OPENAI_API_KEY`: OpenAI API key for AI chatbot functionality
 
 ## Default Values
 

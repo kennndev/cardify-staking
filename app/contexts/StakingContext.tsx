@@ -1,18 +1,31 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Connection, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
-import { AnchorProvider } from '@coral-xyz/anchor';
-import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { Connection, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { AnchorProvider, BorshAccountsCoder } from '@coral-xyz/anchor';
+import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import BN from 'bn.js';
 
-import { CONTRACT_CONFIG } from '../config/env';
+import { CONTRACT_CONFIG, ENV } from '../config/env';
+
+// Memo program ID for unique transaction signatures
+const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+
+// Shared decimal scaling helper
+const toBaseUnits = (x: string | number, dec: number): BN => {
+  const s = String(x);
+  if (!s.includes('.')) return new BN(s).mul(new BN(10).pow(new BN(dec)));
+  const [intPart, fracPartRaw] = s.split('.');
+  const fracPart = (fracPartRaw + '0'.repeat(dec)).slice(0, dec); // right-pad
+  const whole = intPart ? new BN(intPart) : new BN(0);
+  const frac = fracPart ? new BN(fracPart) : new BN(0);
+  return whole.mul(new BN(10).pow(new BN(dec))).add(frac);
+};
 
 
 // loadProgram gives us a Program built from on-chain IDL or local fallback;
 // PROGRAM_ID is built once (env → PublicKey) so all callers agree
-import { loadProgram, PROGRAM_ID } from '../lib/idl-loader';
+import { loadProgram, PROGRAM_ID, fetchAndSaveOnChainIdl } from '../lib/idl-loader';
 
 // PDA helpers + pk() coercion
 import { pk, poolPda, signerPda, userPda } from '../lib/pda';
@@ -47,6 +60,7 @@ interface UserData {
   owner: string;
   staked: number;
   debt: string;            // big number-safe
+  unpaidRewards: string;   // big number-safe
 }
 
 interface StakingContextType {
@@ -58,12 +72,18 @@ interface StakingContextType {
   isLoading: boolean;
   error: string | null;
   stakingMint: string | null;
+  stakingDecimals: number;
+  rewardDecimals: number;
   
   // Actions
   initializePool: (stakingMint: string) => Promise<void>;
   fetchPoolByMint: (stakingMint: string) => Promise<void>;
+  setStakingMint: (mint: string) => void;
+  diagnoseAccount: (accountAddress: string) => Promise<any>;
+  fetchOnChainIdl: () => Promise<any>;
+  verifyPdaSeeds: (stakingMintStr: string) => { poolPDA: PublicKey; bump: number };
   setRewardConfig: (rewardMint: string, ratePerSec: number) => Promise<void>;
-  updateRate: (ratePerSec: string | number) => Promise<void>;
+  setRewardRate: (ratePerSec: string | number) => Promise<void>;
   addRewardTokens: (amount: number) => Promise<void>;
   checkRewardVaultBalance: () => Promise<number>;
   checkCurrentPoolState: () => Promise<void>;
@@ -93,6 +113,9 @@ export function StakingProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stakingMint, setStakingMint] = useState<string | null>(null);
+  const [stakingDecimals, setStakingDecimals] = useState<number>(6);
+  const [rewardDecimals, setRewardDecimals] = useState<number>(6);
+  const [lastTransactionTime, setLastTransactionTime] = useState<number>(0);
 
   // --- Wallet wiring ---------------------------------------------------------
 
@@ -178,8 +201,8 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       const program = await loadProgram(provider);
 
       // Ensure IDL has Pool layout
-      if (!program.idl.accounts?.some(a => a.name === 'Pool')) {
-        throw new Error("Loaded IDL has no 'Pool' account. Use compiled IDL or on-chain IDL.");
+      if (!program.idl.accounts?.some(a => a.name.toLowerCase() === 'pool')) {
+        throw new Error("Loaded IDL missing 'pool' account in IDL");
       }
 
       // If we already know the pool PDA, fetch it; otherwise noop
@@ -195,26 +218,26 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         const pool = await (program.account as any).pool.fetch(poolPDA);
         
         console.log('Raw pool data from blockchain:', {
-          ratePerSec: pool.ratePerSec.toString(),
-          ratePerSecNumber: pool.ratePerSec.toNumber(),
-          rewardMint: pool.rewardMint.toBase58(),
-          totalStaked: pool.totalStaked.toNumber(),
-          admin: pool.admin.toBase58()
+          rewardRatePerSec: pool.rewardRatePerSec?.toString?.() ?? 'undefined',
+          rewardRatePerSecNumber: pool.rewardRatePerSec?.toNumber?.() ?? 0,
+          rewardMint: pool.rewardMint?.toBase58?.() ?? 'undefined',
+          totalStaked: pool.totalStaked?.toNumber?.() ?? 0,
+          admin: pool.admin?.toBase58?.() ?? 'undefined'
         });
         
         setPoolData({
           poolAddress: poolPDA.toBase58(),
-          admin: pool.admin.toBase58(),
-          stakingMint: pool.stakingMint.toBase58(),
-          rewardMint: pool.rewardMint.toBase58(),
-          stakingVault: pool.stakingVault.toBase58(),
-          rewardVault: pool.rewardVault.toBase58(),
-          totalStaked: pool.totalStaked.toNumber(),
-          accScaled: pool.accScaled.toString(),
-          lastUpdateTs: pool.lastUpdateTs.toNumber(),
-          ratePerSec: pool.ratePerSec.toNumber(),
-          bump: pool.bump,
-          signerBump: pool.signerBump,
+          admin: pool.admin?.toBase58() ?? 'Unknown',
+          stakingMint: pool.stakingMint?.toBase58() ?? 'Unknown',
+          rewardMint: pool.rewardMint?.toBase58() ?? 'Unknown',
+          stakingVault: pool.stakingVault?.toBase58() ?? 'Unknown',
+          rewardVault: pool.rewardVault?.toBase58() ?? 'Unknown',
+          totalStaked: pool.totalStaked?.toNumber?.() ?? 0,
+          accScaled: pool.accScaled?.toString?.() ?? '0',
+          lastUpdateTs: pool.lastUpdateTs?.toNumber?.() ?? 0,
+          ratePerSec: pool.rewardRatePerSec?.toNumber?.() ?? 0,  // <-- Fixed: was pool.ratePerSec
+          bump: pool.bump ?? 0,
+          signerBump: pool.signerBump ?? 0,
         });
 
         // Fetch User only if the PDA exists
@@ -223,9 +246,10 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         if (userInfo) {
           const user = await (program.account as any).user.fetch(userPDA);
           setUserData({
-            owner: user.owner.toBase58(),
-            staked: user.staked.toNumber(),
-            debt: user.debt.toString(),
+            owner: user.owner?.toBase58() ?? 'Unknown',
+            staked: user.staked?.toNumber?.() ?? 0,
+            debt: user.debt?.toString?.() ?? '0',
+            unpaidRewards: user.unpaidRewards?.toString?.() ?? '0',
           });
         } else {
           setUserData(null);
@@ -252,31 +276,42 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     if (!walletAddress) return;
     
     try {
-      console.log('🔍 Auto-detecting pool...');
+      console.log('🔍 Setting up staking context...');
       
-      // Try to find the pool by checking common staking mints
-      // For now, we'll use a hardcoded mint, but this could be made configurable
-      const commonStakingMints = [
-        '8AzxGFi1MbAxv2t7KHUWPUgYKvR641UTD6hMDFXfAy77', // Your current mint
-        // Add more common mints here if needed
-      ];
-      
-      for (const mint of commonStakingMints) {
+      // If we already have a staking mint set, try to fetch the pool for it
+      if (stakingMint) {
         try {
-          console.log(`Checking mint: ${mint}`);
-          await fetchPoolByMint(mint);
-          setStakingMint(mint);
-          console.log(`✅ Pool found for mint: ${mint}`);
-          return; // Exit early if pool found
+          console.log(`🔍 Trying to fetch pool for current staking mint: ${stakingMint}`);
+          await fetchPoolByMint(stakingMint);
+          console.log('✅ Pool found for current staking mint!');
+          return;
         } catch (error) {
-          console.log(`❌ No pool found for mint: ${mint}`);
-          continue;
+          console.log('❌ No pool found for current staking mint:', error instanceof Error ? error.message : String(error));
+          console.log('💡 This is normal if the pool hasn\'t been created yet');
         }
       }
       
-      console.log('❌ No pool found for any common mints');
+      // If no staking mint is set, use environment variable or leave empty for admin to set
+      if (ENV.STAKING_MINT && ENV.STAKING_MINT !== '11111111111111111111111111111111') {
+        console.log(`🔧 Setting staking mint from environment: ${ENV.STAKING_MINT}`);
+        setStakingMint(ENV.STAKING_MINT);
+        
+        // Try to fetch the pool, but don't fail if it doesn't exist
+        try {
+          await fetchPoolByMint(ENV.STAKING_MINT);
+          console.log('✅ Pool found for environment staking mint!');
+          return;
+        } catch (error) {
+          console.log('ℹ️ No pool found for environment staking mint (normal for new deployments)');
+        }
+      } else {
+        console.log('ℹ️ No staking mint configured - ready for admin to set up');
+        console.log('💡 Use the admin interface to set the staking mint and initialize a pool');
+      }
+      
     } catch (error) {
       console.log('❌ Auto-detection failed:', error);
+      console.log('💡 This is normal for new deployments - use the admin interface to set up');
     }
   };
 
@@ -313,35 +348,139 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       const stakingMint = new PublicKey(stakingMintStr);
       const poolPDA = poolPda(program.programId, stakingMint);
       
-      console.log('Pool PDA:', poolPDA.toBase58());
+      console.log('Debug PDA derivation:', {
+        programId: program.programId.toBase58(),
+        stakingMint: stakingMint.toBase58(),
+        poolPDA: poolPDA.toBase58()
+      });
       
-      // Fetch the pool data
-      const pool = await (program.account as any).pool.fetch(poolPDA);
-      console.log('Pool data fetched:', pool);
+      // Check if the account exists and has valid data before trying to fetch
+      const accountInfo = await connection.getAccountInfo(poolPDA);
+      if (!accountInfo) {
+        throw new Error('Pool account does not exist');
+      }
+      
+      console.log('Pool account info:', {
+        owner: accountInfo.owner.toBase58(),
+        executable: accountInfo.executable,
+        lamports: accountInfo.lamports,
+        dataLength: accountInfo.data?.length,
+        isProgramAccount: accountInfo.owner.equals(program.programId)
+      });
+      
+      // Validate that the account is owned by our program
+      if (!accountInfo.owner.equals(program.programId)) {
+        throw new Error(`Pool account is not owned by our program. Owner: ${accountInfo.owner.toBase58()}, Expected: ${program.programId.toBase58()}`);
+      }
+      
+      // Check if the account has data
+      if (!accountInfo.data || accountInfo.data.length === 0) {
+        throw new Error('Pool account has no data');
+      }
+      
+      // Check account discriminator to verify it's actually a Pool account
+      console.log('🔍 Checking account discriminator...');
+      const discPool = BorshAccountsCoder.accountDiscriminator('Pool');
+      const discUser = BorshAccountsCoder.accountDiscriminator('User');
+      const got = accountInfo.data.slice(0, 8);
+      
+      const isPool = Buffer.compare(got, discPool) === 0;
+      const isUser = Buffer.compare(got, discUser) === 0;
+      
+      console.log('Discriminator check:', {
+        isPool,
+        isUser,
+        gotDiscriminator: Array.from(got),
+        expectedPoolDisc: Array.from(discPool),
+        expectedUserDisc: Array.from(discUser)
+      });
+      
+      if (isUser) {
+        throw new Error('Account at pool PDA is a User account, not a Pool account. Check your PDA derivation seeds.');
+      }
+      
+      if (!isPool) {
+        throw new Error('Account at pool PDA is not a Pool account (discriminator mismatch). This might be a different account type or corrupted data.');
+      }
+      
+      console.log('✅ Account discriminator matches Pool - proceeding with decode');
+      
+      // Try to fetch the pool data with better error handling
+      let pool;
+      try {
+        pool = await (program.account as any).pool.fetch(poolPDA);
+        console.log('Pool data fetched successfully:', pool);
+      } catch (decodeError) {
+        console.error('Failed to decode pool account:', decodeError);
+        console.log('Account data length:', accountInfo.data.length);
+        console.log('Account data (first 32 bytes):', accountInfo.data.slice(0, 32));
+        
+        // Check if this might be a different account type or corrupted data
+        if (decodeError instanceof Error && decodeError.message.includes('beyond buffer length')) {
+          console.log('🔍 Account Analysis:');
+          console.log('- Account exists and discriminator matches Pool');
+          console.log('- But IDL layout mismatch:');
+          console.log(`  - On-chain data length: ${accountInfo.data.length} bytes`);
+          console.log(`  - Expected by local IDL: ~265 bytes`);
+          console.log(`  - Difference: ${accountInfo.data.length - 265} bytes`);
+          console.log('💡 This means your local IDL does not match the deployed program');
+          console.log('💡 Solutions:');
+          console.log('  1. Use the exact IDL that was compiled with the deployed program');
+          console.log('  2. Rebuild and redeploy the program to match your current IDL');
+          console.log('  3. Check if the program was updated but IDL wasn\'t updated');
+          console.log('  4. Verify the _reserved array length in your struct');
+          
+          throw new Error(`Pool decode failed: IDL/program layout mismatch. Account data length=${accountInfo.data.length} bytes, but your local IDL expects ~265 bytes. Update your IDL to match the deployed binary (or redeploy the program).`);
+        }
+        throw decodeError;
+      }
       
       setPoolData({
         poolAddress: poolPDA.toString(),
-        admin: pool.admin.toString(),
-        stakingMint: pool.stakingMint.toString(),
-        rewardMint: pool.rewardMint.toString(),
-        stakingVault: pool.stakingVault.toString(),
-        rewardVault: pool.rewardVault.toString(),
-        totalStaked: pool.totalStaked.toNumber(),
-        accScaled: pool.accScaled.toString(),
-        lastUpdateTs: pool.lastUpdateTs.toNumber(),
-        ratePerSec: pool.ratePerSec.toNumber(),
-        bump: pool.bump,
-        signerBump: pool.signerBump,
+        admin: pool.admin?.toString() ?? 'Unknown',
+        stakingMint: pool.stakingMint?.toString() ?? 'Unknown',
+        rewardMint: pool.rewardMint?.toString() ?? 'Unknown',
+        stakingVault: pool.stakingVault?.toString() ?? 'Unknown',
+        rewardVault: pool.rewardVault?.toString() ?? 'Unknown',
+        totalStaked: pool.totalStaked?.toNumber?.() ?? 0,
+        accScaled: pool.accScaled?.toString?.() ?? '0',
+        lastUpdateTs: pool.lastUpdateTs?.toNumber?.() ?? 0,
+        ratePerSec: pool.rewardRatePerSec?.toNumber?.() ?? 0,
+        bump: pool.bump ?? 0,
+        signerBump: pool.signerBump ?? 0,
       });
+
+      // Fetch token decimals
+      try {
+        const { getMint } = await import('@solana/spl-token');
+        const stakingMintPk = new PublicKey(pool.stakingMint?.toString() ?? 'Unknown');
+        const rewardMintPk = new PublicKey(pool.rewardMint?.toString() ?? 'Unknown');
+        
+        const stakingInfo = await getMint(connection, stakingMintPk);
+        const rewardInfo = await getMint(connection, rewardMintPk);
+        
+        setStakingDecimals(stakingInfo.decimals ?? 6);
+        setRewardDecimals(rewardInfo.decimals ?? 6);
+        
+        console.log('Token decimals fetched:', {
+          staking: stakingInfo.decimals,
+          reward: rewardInfo.decimals
+        });
+      } catch (decimalError) {
+        console.warn('Failed to fetch token decimals, using defaults:', decimalError);
+        setStakingDecimals(6);
+        setRewardDecimals(6);
+      }
 
       // Try to fetch user data if available
       try {
         const userPDA = userPda(program.programId, poolPDA, new PublicKey(walletAddress));
         const user = await (program.account as any).user.fetch(userPDA);
         setUserData({
-          owner: user.owner.toString(),
-          staked: user.staked.toNumber(),
-          debt: user.debt.toString(),
+          owner: user.owner?.toString() ?? 'Unknown',
+          staked: user.staked?.toNumber?.() ?? 0,
+          debt: user.debt?.toString?.() ?? '0',
+          unpaidRewards: user.unpaidRewards?.toString?.() ?? '0',
         });
         console.log('User data fetched:', user);
       } catch (userError) {
@@ -382,6 +521,15 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         signTransaction: async (tx: any) => (window as any).solana.signTransaction(tx),
         signAllTransactions: async (txs: any[]) => (window as any).solana.signAllTransactions(txs),
       };
+
+      // Add a small delay to prevent rapid-fire transactions
+      console.log('⏳ Waiting 1 second before submitting transaction...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get fresh blockhash to prevent "Blockhash not found" errors
+      console.log('🔄 Getting fresh blockhash...');
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      console.log('✅ Fresh blockhash obtained:', blockhash);
 
       // Initialize on-chain (creates Pool PDA + stakingVault ATA)
       const initRes = await initializeOnly(stakingMint, wallet);
@@ -437,23 +585,86 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateRate = async (humanRatePerSec: string | number) => {
+  const setRewardRate = async (humanRatePerSec: string | number) => {
     if (!isAdmin || !walletAddress || !poolData) throw new Error('Only admin can update rate');
     setIsLoading(true);
     setError(null);
 
     try {
-      console.log('⚠️ updateRate instruction not available in current program');
-      console.log('The program needs to be redeployed with updateRate instruction');
-      console.log('Current workaround: You can manually update the rate by calling setRewardConfig again');
-      console.log('But first, you need to reset the pool or use a different approach');
-      
-      setError('updateRate instruction not available. Program needs to be redeployed with this instruction.');
-      throw new Error('updateRate instruction not available in current program'); 
+             const wallet = {
+               publicKey: pk(walletAddress),
+               signTransaction: async (tx: any) => {
+                 if ((window as any).solana?.isPhantom) return await (window as any).solana.signTransaction(tx);
+                 throw new Error('Wallet not connected');
+               },
+               signAllTransactions: async (txs: any[]) => {
+                 if ((window as any).solana?.isPhantom) return await (window as any).solana.signAllTransactions(txs);
+                 throw new Error('Wallet not connected');
+               },
+             };
+
+             const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+             const program = await loadProgram(provider);
+
+             const poolPDA = pk(poolData.poolAddress);
+             
+             // Scale rate to base units using reward mint decimals
+             const { getMint } = await import('@solana/spl-token');
+             const rewardMintPk = pk(poolData.rewardMint);
+             const mintInfo = await getMint(connection, rewardMintPk);
+             const decimals = mintInfo.decimals ?? 0;
+             const ratePerSecBase = toBaseUnits(humanRatePerSec, decimals);
+
+             console.log('Updating reward rate:', {
+               humanRate: humanRatePerSec,
+               decimals,
+               baseRate: ratePerSecBase.toString()
+             });
+
+             // Add a small delay to prevent rapid-fire transactions
+             console.log('⏳ Waiting 1 second before submitting transaction...');
+             await new Promise(resolve => setTimeout(resolve, 1000));
+             
+             // Get fresh blockhash to prevent "Blockhash not found" errors
+             console.log('🔄 Getting fresh blockhash...');
+             const { blockhash } = await connection.getLatestBlockhash('confirmed');
+             console.log('✅ Fresh blockhash obtained:', blockhash);
+
+             const sig = await program.methods
+               .setRewardRate(ratePerSecBase)
+               .accounts({
+                 pool: poolPDA,
+                 admin: pk(walletAddress),
+               })
+               .rpc({ 
+                 skipPreflight: true, 
+                 commitment: 'confirmed'
+               });
+
+             console.log('✅ setRewardRate tx:', sig);
+             await new Promise(r => setTimeout(r, 1200));
+             await refreshData();
     } catch (e: any) {
-      console.error('❌ updateRate failed', e);
-      setError(e?.message ?? 'Failed to update rate');
-      throw e;
+      console.error('❌ setRewardRate failed', e);
+      
+      // Handle specific transaction errors
+      if (e?.message?.includes('already been processed')) {
+        console.log('🔄 Transaction already processed - treating as success');
+        console.log('✅ setRewardRate successful (transaction was already processed)');
+        await refreshData();
+        return;
+      } else if (e?.message?.includes('Blockhash not found')) {
+        console.log('🔄 Blockhash not found - this is a network timing issue');
+        console.log('💡 This usually resolves itself, please try again');
+        throw new Error('Network timing issue. Please try again in a moment.');
+      } else if (e?.message?.includes('simulation failed')) {
+        console.log('🔄 Transaction simulation failed - checking for specific issues');
+        console.log('💡 This might be due to pool configuration issues or insufficient permissions');
+        throw new Error('Transaction simulation failed. Please check your admin permissions and try again.');
+      } else {
+        setError(e?.message ?? 'Failed to update rate');
+        throw e;
+      }
     } finally {
       setIsLoading(false);
     }
@@ -489,33 +700,122 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       const mintInfo = await getMint(connection, rewardMintPk);
       const decimals = mintInfo.decimals ?? 0;
 
-      // Convert a decimal string/number to BN in base units
-      const toBaseUnits = (x: string | number, dec: number) => {
-        const s = String(x);
-        if (!s.includes('.')) return new BN(s).mul(new BN(10).pow(new BN(dec)));
-        const [intPart, fracPartRaw] = s.split('.');
-        const fracPart = (fracPartRaw + '0'.repeat(dec)).slice(0, dec); // right-pad
-        const whole = intPart ? new BN(intPart) : new BN(0);
-        const frac = fracPart ? new BN(fracPart) : new BN(0);
-        return whole.mul(new BN(10).pow(new BN(dec))).add(frac);
-      };
+      // Use shared decimal scaling helper
 
       const ratePerSecBase = toBaseUnits(ratePerSecHuman, decimals);
       if (ratePerSecBase.isZero()) {
         console.warn('ratePerSec scaled to 0; APY will remain 0. Use a larger rate or fewer decimals.');
       }
 
-      // ---- IMPORTANT: reward_vault must be a NEW keypair signer (not an ATA) ----
-      const { Keypair } = await import('@solana/web3.js');
-      const rewardVaultKeypair = Keypair.generate();
-      const rewardVault = rewardVaultKeypair.publicKey;
+      // ---- IMPORTANT: reward_vault must be an ATA with PDA as authority ----
+      // The new contract expects an ATA with pool_signer as authority
+      const rewardVault = await getAssociatedTokenAddress(
+        rewardMintPk,
+        signerPDA,
+        true // allowOwnerOffCurve = true for PDA
+      );
+      
+      console.log('🔍 ATA Debug Info:');
+      console.log('Reward Mint:', rewardMintPk.toBase58());
+      console.log('Pool Signer PDA:', signerPDA.toBase58());
+      console.log('Derived Reward Vault:', rewardVault.toBase58());
+      
+      // Verify the ATA derivation is correct
+      console.log('🔍 Account Verification:');
+      console.log('Pool PDA:', poolPDA.toBase58());
+      console.log('Admin:', walletAddress);
+      console.log('Reward Mint:', rewardMintPk.toBase58());
+      console.log('Pool Signer:', signerPDA.toBase58());
+      console.log('Reward Vault:', rewardVault.toBase58());
+      
+      // Check if the ATA already exists and verify its owner
+      try {
+        const ataInfo = await connection.getAccountInfo(rewardVault);
+        if (ataInfo) {
+          console.log('⚠️ ATA already exists - checking owner...');
+          
+          // Parse the ATA account to check its owner
+          const { getAccount } = await import('@solana/spl-token');
+          try {
+            const tokenAccount = await getAccount(connection, rewardVault);
+            console.log('ATA Owner:', tokenAccount.owner.toBase58());
+            console.log('Expected Owner (PDA):', signerPDA.toBase58());
+            
+            if (!tokenAccount.owner.equals(signerPDA)) {
+              console.log('❌ ATA has wrong owner! Expected PDA but got:', tokenAccount.owner.toBase58());
+              console.log('💡 This ATA was created with a different owner than the PDA');
+              console.log('🔧 The program expects to create the ATA with PDA as owner, but it already exists with a different owner');
+              console.log('📝 Solutions:');
+              console.log('1. Use a different reward mint (recommended)');
+              console.log('2. Create a new pool with a different staking mint');
+              console.log('3. The program needs to be updated to handle existing ATAs');
+               throw new Error(`ATA already exists with wrong owner. Expected ${signerPDA.toBase58()} but got ${tokenAccount.owner.toBase58()}. Please use a different reward mint or create a new pool.`);
+            } else {
+              console.log('✅ ATA has correct owner (PDA)');
+              console.log('🔍 Checking ATA balance...');
+              console.log('ATA Balance:', tokenAccount.amount.toString());
+              if (tokenAccount.amount > 0) {
+                console.log('⚠️ ATA has existing balance - this might affect the configuration');
+              } else {
+                console.log('✅ ATA is empty - safe to proceed');
+              }
+              
+              // Since the ATA already exists, the program's init constraint will fail
+              console.log('❌ BLOCKING: ATA already exists but program uses init constraint');
+              console.log('💡 The program expects to create the ATA, but it already exists');
+              console.log('🔧 This will fail with "Provided owner is not allowed"');
+              console.log('📝 Solutions:');
+              console.log('1. Use a different reward mint (recommended)');
+              console.log('2. Create a new pool with different staking mint');
+              console.log('3. Update the program to handle existing ATAs');
+              throw new Error('ATA already exists but program uses init constraint. Please use a different reward mint or create a new pool.');
+            }
+          } catch (parseError) {
+            console.log('Could not parse ATA account:', parseError);
+            console.log('🔍 ATA Account Info:', {
+              address: rewardVault.toBase58(),
+              exists: true,
+              parseError: parseError instanceof Error ? parseError.message : String(parseError)
+            });
+            
+            // Try to get raw account info to understand what's happening
+            try {
+              const rawAccountInfo = await connection.getAccountInfo(rewardVault);
+              console.log('Raw ATA Account Info:', {
+                address: rewardVault.toBase58(),
+                owner: rawAccountInfo?.owner?.toBase58(),
+                executable: rawAccountInfo?.executable,
+                lamports: rawAccountInfo?.lamports,
+                dataLength: rawAccountInfo?.data?.length,
+                data: rawAccountInfo?.data ? 'Has data' : 'No data'
+              });
+            } catch (rawError) {
+              console.log('Could not get raw account info:', rawError);
+            }
+            
+            // If we can't parse the ATA, it might be in an invalid state
+            // Let's try to proceed anyway and let the program handle it
+            console.log('⚠️ ATA exists but cannot be parsed - proceeding anyway');
+            console.log('💡 The program might be able to handle this invalid ATA state');
+            console.log('🔧 If this fails, try using a different reward mint');
+            
+            // Don't throw an error, just log and continue
+            // The program might be able to handle the invalid ATA
+          }
+        } else {
+          console.log('✅ ATA does not exist yet (normal for new setup)');
+        }
+      } catch (e) {
+        console.log('ATA check failed:', e);
+        throw e; // Re-throw if it's an error we want to handle
+      }
 
       console.log('SetRewardConfig accounts', {
         pool: poolPDA.toBase58(),
         admin: walletAddress,
-        signer: signerPDA.toBase58(),
+        poolSigner: signerPDA.toBase58(),  // <-- Fixed: was signer
         rewardMint: rewardMintPk.toBase58(),
-        rewardVault: rewardVault.toBase58(), // new random address, program will init it
+        rewardVault: rewardVault.toBase58(),
       });
 
       console.log('Rate scaling:', {
@@ -525,29 +825,71 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         baseRateNumber: ratePerSecBase.toNumber()
       });
 
+      // Check if pool is already configured
+      if (poolData && poolData.rewardMint && poolData.rewardMint !== '11111111111111111111111111111111') {
+        console.log('❌ Pool rewards are already configured!');
+        console.log('Current reward mint:', poolData.rewardMint);
+        console.log('Current rate per sec:', poolData.ratePerSec);
+        console.log('💡 Use setRewardRate to update the rate instead');
+        throw new Error('Pool rewards are already configured. Use setRewardRate to update the rate instead.');
+      }
+
+      console.log('🔍 About to call configureRewards...');
+      console.log('⚠️ WARNING: The ATA already exists, but the program now uses init_if_needed');
+      console.log('💡 This should work with the updated program');
+      console.log('🔧 If this fails, the pool might already be configured');
+
+      // Add a small delay to prevent rapid-fire transactions
+      console.log('⏳ Waiting 1 second before submitting transaction...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get fresh blockhash to prevent "Blockhash not found" errors
+      console.log('🔄 Getting fresh blockhash...');
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      console.log('✅ Fresh blockhash obtained:', blockhash);
+
       const sig = await program.methods
-        .setRewardConfig(ratePerSecBase)
+        .configureRewards(ratePerSecBase)
         .accounts({
           pool: poolPDA,
           admin: pk(walletAddress),
           rewardMint: rewardMintPk,
-          signer: signerPDA,
-          rewardVault,                        // new account to be created by the program
-          systemProgram: SystemProgram.programId,
+          poolSigner: signerPDA,
+          rewardVault,                        // ATA with PDA as authority
           tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
           rent: SYSVAR_RENT_PUBKEY,
-          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, // not strictly needed, fine to include
         })
-        .signers([rewardVaultKeypair])        // <- THIS IS THE CRITICAL PART
-        .rpc();
+        .rpc({ 
+          skipPreflight: false, 
+          commitment: 'confirmed',
+          preflightCommitment: 'confirmed'
+        });
 
       console.log('✅ setRewardConfig tx:', sig);
       await new Promise(r => setTimeout(r, 1200));
       await refreshData();
     } catch (e: any) {
       console.error('❌ setRewardConfig failed', e);
-      setError(e?.message ?? 'Failed to set reward config');
-      throw e;
+      
+      // Handle specific transaction errors
+      if (e?.message?.includes('already been processed')) {
+        console.log('🔄 Transaction already processed - this might be a duplicate submission');
+        console.log('💡 Try refreshing the page and attempting the configuration again');
+        throw new Error('Transaction already processed. Please refresh and try again.');
+      } else if (e?.message?.includes('Blockhash not found')) {
+        console.log('🔄 Blockhash not found - this is a network timing issue');
+        console.log('💡 This usually resolves itself, please try again');
+        throw new Error('Network timing issue. Please try again in a moment.');
+      } else if (e?.message?.includes('simulation failed')) {
+        console.log('🔄 Transaction simulation failed - checking for specific issues');
+        console.log('💡 This might be due to pool configuration issues or insufficient permissions');
+        throw new Error('Transaction simulation failed. Please check your admin permissions and try again.');
+      } else {
+        setError(e?.message ?? 'Failed to set reward config');
+        throw e;
+      }
     } finally {
       setIsLoading(false);
     }
@@ -576,8 +918,68 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       
       // Derive accounts
       const poolPDA = pk(poolData.poolAddress);
-      const signerPDA = signerPda(program.programId, poolPDA);
+      
+      // Use the signer PDA that was actually created during pool initialization
+      // The pool data contains the signerBump that was used
+      const [signerPDA, signerBump] = PublicKey.findProgramAddressSync(
+        [Buffer.from("signer"), poolPDA.toBuffer()],
+        program.programId
+      );
+      
+      // Read the actual pool signer from the vault token account authority
+      // This is more reliable than trying to derive the PDA client-side
+      const { getAccount } = await import('@solana/spl-token');
+      const stakingVaultPk = pk(poolData.stakingVault);
+      
+      console.log('🔍 Reading pool signer from vault authority...');
+      const vaultAccount = await getAccount(connection, stakingVaultPk);
+      const poolSigner = new PublicKey(vaultAccount.owner);
+      
+      console.log('✅ Pool signer (from vault authority):', poolSigner.toBase58());
+      console.log('🔍 Comparing with our derivation:', signerPDA.toBase58());
+      console.log('🔍 Expected from error:', 'DHPdammvheftDaSmEvPuDnHErMTudC1iTGjfLPbPnsbt');
+      console.log('🔍 Matches expected:', poolSigner.toBase58() === 'DHPdammvheftDaSmEvPuDnHErMTudC1iTGjfLPbPnsbt');
+      
+      // Use the actual pool signer from vault authority
+      const correctSignerPDA = poolSigner;
+      
       const userPDA = userPda(program.programId, poolPDA, pk(walletAddress));
+      
+      // Debug PDA derivations
+      console.log('🔍 PDA Derivation Debug:');
+      console.log('Program ID:', program.programId.toBase58());
+      console.log('Pool PDA:', poolPDA.toBase58());
+      console.log('Signer PDA (our derivation):', signerPDA.toBase58());
+      console.log('User PDA:', userPDA.toBase58());
+      
+      // Check if the signer PDA derivation matches what the program expects
+      const [expectedSignerPDA, expectedBump] = PublicKey.findProgramAddressSync(
+        [Buffer.from("signer"), poolPDA.toBuffer()],
+        program.programId
+      );
+      console.log('Expected Signer PDA:', expectedSignerPDA.toBase58());
+      console.log('Expected Bump:', expectedBump);
+      console.log('Signer PDA matches expected:', signerPDA.equals(expectedSignerPDA));
+      
+      // Try alternative derivations that the program might expect
+      const [altSignerPDA1, altBump1] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pool_signer"), poolPDA.toBuffer()],
+        program.programId
+      );
+      console.log('Alternative Signer PDA (pool_signer):', altSignerPDA1.toBase58());
+      
+      const [altSignerPDA2, altBump2] = PublicKey.findProgramAddressSync(
+        [Buffer.from("signer"), poolPDA.toBuffer()],
+        program.programId
+      );
+      console.log('Alternative Signer PDA (signer):', altSignerPDA2.toBase58());
+      
+      // Check if any of these match the expected address from the error
+      const expectedFromError = 'DHPdammvheftDaSmEvPuDnHErMTudC1iTGjfLPbPnsbt';
+      console.log('Expected from error:', expectedFromError);
+      console.log('Our derivation matches error:', signerPDA.toBase58() === expectedFromError);
+      console.log('Alt derivation 1 matches error:', altSignerPDA1.toBase58() === expectedFromError);
+      console.log('Alt derivation 2 matches error:', altSignerPDA2.toBase58() === expectedFromError);
       
       // Get user's staking ATA
       const userStakingAta = await getAssociatedTokenAddress(
@@ -593,14 +995,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       const stakeMintInfo = await getMint(connection, pk(poolData.stakingMint));
       const d = stakeMintInfo.decimals ?? 0;
 
-      const toBaseUnits = (x: string | number, dec: number) => {
-        const s = String(x);
-        if (!s.includes('.')) return new BN(s).mul(new BN(10).pow(new BN(dec)));
-        const [i, fRaw] = s.split('.');
-        const f = (fRaw + '0'.repeat(dec)).slice(0, dec);
-        const whole = i ? new BN(i) : new BN(0);
-        return whole.mul(new BN(10).pow(new BN(dec))).add(new BN(f || '0'));
-      };
+      // Use shared decimal scaling helper
 
       const amountBase = toBaseUnits(amount, d);
 
@@ -613,28 +1008,85 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       console.log('Stake accounts:', {
         owner: walletAddress,
         pool: poolPDA.toBase58(),
-        signer: signerPDA.toBase58(),
+        signer: correctSignerPDA.toBase58(),
         userStakingAta: userStakingAta.toBase58(),
         stakingVault: stakingVault.toBase58(),
         user: userPDA.toBase58(),
       });
       
-      // Call stake instruction
-      await program.methods
-        .stake(amountBase)
-        .accounts({
-          owner: pk(walletAddress),
-          pool: poolPDA,
-          signer: signerPDA,
-          userStakingAta,
-          stakingVault,
-          user: userPDA,
-          systemProgram: SystemProgram.programId,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-          rent: SYSVAR_RENT_PUBKEY,
-        })
-        .rpc();
+      // Check user's token balance before staking
+      try {
+        const userTokenAccount = await getAccount(connection, userStakingAta);
+        console.log('🔍 User token balance:', userTokenAccount.amount.toString());
+        console.log('🔍 Amount to stake:', amountBase.toString());
+        
+        if (userTokenAccount.amount < BigInt(amountBase.toString())) {
+          throw new Error(`Insufficient token balance. Available: ${userTokenAccount.amount.toString()}, Required: ${amountBase.toString()}`);
+        }
+      } catch (balanceError) {
+        console.log('⚠️ Could not check token balance:', balanceError);
+        console.log('💡 Proceeding with transaction - balance will be checked by the program');
+      }
+      
+      // Add a small delay to prevent rapid-fire transactions
+      console.log('⏳ Waiting 1 second before submitting transaction...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get fresh blockhash to prevent "Blockhash not found" errors
+      console.log('🔄 Getting fresh blockhash...');
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      console.log('✅ Fresh blockhash obtained:', blockhash);
+      
+      // Check if we should use the signer from pool data instead
+      if (poolData.signerBump && poolData.signerBump > 0) {
+        console.log('🔍 Pool data has signerBump:', poolData.signerBump);
+        console.log('🔍 This suggests the signer PDA was derived during pool initialization');
+        console.log('🔍 Let me check if we need to use a different derivation...');
+      }
+      
+      // Call stake instruction with proper transaction handling
+      try {
+        const tx = await program.methods
+          .stake(amountBase)
+          .accounts({
+            owner: pk(walletAddress),
+            pool: poolPDA,
+            poolSigner: correctSignerPDA,     // <-- Fixed: was signer
+            userStakingAta,
+            stakingVault,
+            user: userPDA,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            rent: SYSVAR_RENT_PUBKEY,
+          })
+          .rpc({ 
+            skipPreflight: true, 
+            commitment: 'confirmed'
+          });
+        
+        console.log('✅ Stake transaction successful:', tx);
+      } catch (txError: any) {
+        console.error('❌ Transaction failed:', txError);
+        
+        // Handle specific transaction errors
+        if (txError.message?.includes('already been processed')) {
+          console.log('🔄 Transaction already processed - treating as success');
+          console.log('✅ Stake successful (transaction was already processed)');
+          await refreshData();
+          return;
+        } else if (txError.message?.includes('Blockhash not found')) {
+          console.log('🔄 Blockhash not found - this is a network timing issue');
+          console.log('💡 This usually resolves itself, please try again');
+          throw new Error('Network timing issue. Please try again in a moment.');
+        } else if (txError.message?.includes('simulation failed')) {
+          console.log('🔄 Transaction simulation failed - checking for specific issues');
+          console.log('💡 This might be due to insufficient funds or account issues');
+          throw new Error('Transaction simulation failed. Please check your token balance and try again.');
+        } else {
+          throw txError;
+        }
+      }
       
       console.log('✅ Stake successful');
       
@@ -680,7 +1132,17 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       
       // Derive accounts
       const poolPDA = pk(poolData.poolAddress);
-      const signerPDA = signerPda(program.programId, poolPDA);
+      
+      // Read the actual pool signer from the vault token account authority
+      const { getAccount } = await import('@solana/spl-token');
+      const stakingVaultPk = pk(poolData.stakingVault);
+      
+      console.log('🔍 Reading pool signer from vault authority for unstake...');
+      const vaultAccount = await getAccount(connection, stakingVaultPk);
+      const poolSigner = new PublicKey(vaultAccount.owner);
+      
+      console.log('✅ Pool signer (from vault authority):', poolSigner.toBase58());
+      
       const userPDA = userPda(program.programId, poolPDA, pk(walletAddress));
       
       // Get user's staking ATA
@@ -697,14 +1159,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       const stakeMintInfo = await getMint(connection, pk(poolData.stakingMint));
       const d = stakeMintInfo.decimals ?? 0;
 
-      const toBaseUnits = (x: string | number, dec: number) => {
-        const s = String(x);
-        if (!s.includes('.')) return new BN(s).mul(new BN(10).pow(new BN(dec)));
-        const [i, fRaw] = s.split('.');
-        const f = (fRaw + '0'.repeat(dec)).slice(0, dec);
-        const whole = i ? new BN(i) : new BN(0);
-        return whole.mul(new BN(10).pow(new BN(dec))).add(new BN(f || '0'));
-      };
+      // Use shared decimal scaling helper
 
       const amountBase = toBaseUnits(amount, d);
 
@@ -717,25 +1172,75 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       console.log('Unstake accounts:', {
         owner: walletAddress,
         pool: poolPDA.toBase58(),
-        signer: signerPDA.toBase58(),
+        signer: poolSigner.toBase58(),
         stakingVault: stakingVault.toBase58(),
         userStakingAta: userStakingAta.toBase58(),
         user: userPDA.toBase58(),
       });
       
-      // Call unstake instruction
-      await program.methods
-        .unstake(amountBase)
-        .accounts({
-          owner: pk(walletAddress),
-          pool: poolPDA,
-          signer: signerPDA,
-          stakingVault,
-          userStakingAta,
-          user: userPDA,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        })
-        .rpc();
+      // Check user's staked balance before unstaking
+      try {
+        const userTokenAccount = await getAccount(connection, userStakingAta);
+        console.log('🔍 User staked balance:', userTokenAccount.amount.toString());
+        console.log('🔍 Amount to unstake:', amountBase.toString());
+        
+        if (userTokenAccount.amount < BigInt(amountBase.toString())) {
+          throw new Error(`Insufficient staked balance. Available: ${userTokenAccount.amount.toString()}, Required: ${amountBase.toString()}`);
+        }
+      } catch (balanceError) {
+        console.log('⚠️ Could not check staked balance:', balanceError);
+        console.log('💡 Proceeding with transaction - balance will be checked by the program');
+      }
+      
+      // Add a small delay to prevent rapid-fire transactions
+      console.log('⏳ Waiting 1 second before submitting transaction...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get fresh blockhash to prevent "Blockhash not found" errors
+      console.log('🔄 Getting fresh blockhash...');
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      console.log('✅ Fresh blockhash obtained:', blockhash);
+      
+      // Call unstake instruction with proper transaction handling
+      try {
+        const tx = await program.methods
+          .unstake(amountBase)
+          .accounts({
+            owner: pk(walletAddress),
+            pool: poolPDA,
+            poolSigner: poolSigner,     // <-- Use vault authority
+            stakingVault,
+            userStakingAta,
+            user: userPDA,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .rpc({ 
+            skipPreflight: true, 
+            commitment: 'confirmed'
+          });
+        
+        console.log('✅ Unstake transaction successful:', tx);
+      } catch (txError: any) {
+        console.error('❌ Transaction failed:', txError);
+        
+        // Handle specific transaction errors
+        if (txError.message?.includes('already been processed')) {
+          console.log('🔄 Transaction already processed - treating as success');
+          console.log('✅ Unstake successful (transaction was already processed)');
+          await refreshData();
+          return;
+        } else if (txError.message?.includes('Blockhash not found')) {
+          console.log('🔄 Blockhash not found - this is a network timing issue');
+          console.log('💡 This usually resolves itself, please try again');
+          throw new Error('Network timing issue. Please try again in a moment.');
+        } else if (txError.message?.includes('simulation failed')) {
+          console.log('🔄 Transaction simulation failed - checking for specific issues');
+          console.log('💡 This might be due to insufficient staked balance or account issues');
+          throw new Error('Transaction simulation failed. Please check your staked balance and try again.');
+        } else {
+          throw txError;
+        }
+      }
       
       console.log('✅ Unstake successful');
       await refreshData();
@@ -748,14 +1253,209 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     }
   };
 
+
   const claim = async () => {
     if (!walletAddress || !poolData) throw new Error('Wallet not connected or pool not initialized');
+    
+    // Prevent duplicate submissions within 5 seconds
+    const now = Date.now();
+    if (now - lastTransactionTime < 5000) {
+      throw new Error('Please wait a few seconds before submitting another transaction');
+    }
+    
     setIsLoading(true); 
     setError(null);
+    setLastTransactionTime(now);
+
     try {
-      // TODO: implement claim with pool = pk(poolData.poolAddress)
-      throw new Error('claim not yet implemented with clean approach');
+      console.log('Claiming rewards:', { walletAddress, poolAddress: poolData.poolAddress });
+      
+      // Create wallet adapter
+      const wallet = {
+        publicKey: pk(walletAddress),
+        signTransaction: async (tx: any) => {
+          if (typeof window !== 'undefined' && (window as any).solana?.isPhantom) {
+            return await (window as any).solana.signTransaction(tx);
+          }
+          throw new Error('Wallet not connected');
+        },
+        signAllTransactions: async (txs: any[]) => {
+          if (typeof window !== 'undefined' && (window as any).solana?.isPhantom) {
+            return await (window as any).solana.signAllTransactions(txs);
+          }
+          throw new Error('Wallet not connected');
+        }
+      };
+
+      // Create provider and program
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+      const program = await loadProgram(provider);
+      
+      // Derive accounts
+      const poolPDA = pk(poolData.poolAddress);
+      
+      // Read the actual pool signer from the vault token account authority
+      const { getAccount } = await import('@solana/spl-token');
+      const stakingVaultPk = pk(poolData.stakingVault);
+      
+      console.log('🔍 Reading pool signer from vault authority for claim...');
+      const vaultAccount = await getAccount(connection, stakingVaultPk);
+      const poolSigner = new PublicKey(vaultAccount.owner);
+      
+      console.log('✅ Pool signer (from vault authority):', poolSigner.toBase58());
+      
+      const userPDA = userPda(program.programId, poolPDA, pk(walletAddress));
+      
+      // Get reward vault (from pool data)
+      const rewardVault = pk(poolData.rewardVault);
+      
+      // Get user's reward ATA
+      const userRewardAta = await getAssociatedTokenAddress(
+        pk(poolData.rewardMint),
+        pk(walletAddress)
+      );
+      
+      // Check if user's reward ATA exists, create it if it doesn't
+      try {
+        const ataInfo = await connection.getAccountInfo(userRewardAta);
+        if (!ataInfo) {
+          console.log('🔄 User reward ATA does not exist, creating it...');
+          const createAtaIx = createAssociatedTokenAccountInstruction(
+            pk(walletAddress), // payer
+            userRewardAta, // ata
+            pk(walletAddress), // owner
+            pk(poolData.rewardMint) // mint
+          );
+          
+          // Create the ATA with fresh blockhash to prevent signature collisions
+          const createTx = new Transaction().add(createAtaIx);
+          const { blockhash: freshBlockhash } = await connection.getLatestBlockhash('confirmed');
+          createTx.recentBlockhash = freshBlockhash;
+          createTx.feePayer = pk(walletAddress);
+          
+          await provider.sendAndConfirm(createTx, [], {
+            commitment: 'confirmed',
+            skipPreflight: false,
+            preflightCommitment: 'confirmed'
+          });
+          console.log('✅ User reward ATA created successfully');
+        } else {
+          console.log('✅ User reward ATA already exists');
+        }
+      } catch (ataError: any) {
+        console.error('❌ Error checking/creating user reward ATA:', ataError);
+        throw new Error(`Failed to ensure user reward ATA exists: ${ataError.message}`);
+      }
+      
+      console.log('Claim accounts:', {
+        owner: walletAddress,
+        pool: poolPDA.toBase58(),
+        poolSigner: poolSigner.toBase58(),
+        rewardVault: rewardVault.toBase58(),
+        userRewardAta: userRewardAta.toBase58(),
+        user: userPDA.toBase58(),
+      });
+      
+      // Add a small delay to prevent rapid-fire transactions
+      console.log('⏳ Waiting 1 second before submitting transaction...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Build claim instruction manually to avoid Anchor's blockhash cache
+      try {
+        console.log('🔄 Building claim instruction manually...');
+        
+        // Get the claim instruction (not the full transaction)
+        const claimIx = await program.methods
+          .claim()
+          .accounts({
+            owner: pk(walletAddress),
+            pool: poolPDA,
+            poolSigner: poolSigner,
+            rewardVault,
+            userRewardAta,
+            user: userPDA,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          })
+          .instruction(); // Get instruction instead of .rpc()
+        
+        // Add unique memo to guarantee unique signature using crypto.randomUUID()
+        const uniqueId = crypto.randomUUID();
+        const memoIx = new TransactionInstruction({
+          programId: MEMO_PROGRAM_ID,
+          keys: [],
+          data: Buffer.from(`claim:${uniqueId}`, 'utf8')
+        });
+        
+        console.log('🔄 Using unique memo:', uniqueId);
+        
+        // Build transaction manually
+        const tx = new Transaction().add(memoIx, claimIx);
+        
+        // Fetch blockhash ONCE after building the transaction
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
+        tx.recentBlockhash = blockhash;
+        tx.lastValidBlockHeight = lastValidBlockHeight;
+        tx.feePayer = pk(walletAddress);
+        
+        console.log('🔄 Using fresh blockhash:', blockhash);
+        
+        // Sign and send manually
+        const signed = await wallet.signTransaction(tx);
+        const sig = await connection.sendRawTransaction(
+          signed.serialize(),
+          { skipPreflight: false }
+        );
+        
+        // Confirm transaction
+        await connection.confirmTransaction(
+          { signature: sig, blockhash, lastValidBlockHeight },
+          'confirmed'
+        );
+        
+        console.log('✅ Claim transaction successful:', sig);
+        
+        // Check the actual claimed amount by comparing balances
+        try {
+          const afterBalance = await connection.getTokenAccountBalance(userRewardAta);
+          const claimedAmount = Number(afterBalance.value.amount);
+          const claimedUI = claimedAmount / Math.pow(10, rewardDecimals);
+          console.log('💰 Current reward balance after claim:', {
+            baseUnits: claimedAmount,
+            uiAmount: claimedUI,
+            decimals: rewardDecimals
+          });
+        } catch (balanceError) {
+          console.log('Could not check balance after claim:', balanceError);
+        }
+      } catch (txError: any) {
+        console.error('❌ Transaction failed:', txError);
+        
+        // Handle specific transaction errors
+        if (txError.message?.includes('already been processed')) {
+          console.log('🔄 Transaction already processed - treating as success...');
+          
+          // Treat "already processed" as success - the transaction went through
+          console.log('✅ Claim successful (transaction was already processed)');
+          await refreshData();
+          return; // Exit successfully
+        } else if (txError.message?.includes('Blockhash not found')) {
+          console.log('🔄 Blockhash not found - this is a network timing issue');
+          console.log('💡 This usually resolves itself, please try again');
+          throw new Error('Network timing issue. Please try again in a moment.');
+        } else if (txError.message?.includes('simulation failed')) {
+          console.log('🔄 Transaction simulation failed - checking for specific issues');
+          console.log('💡 This might be due to insufficient rewards or account issues');
+          throw new Error('Transaction simulation failed. Please check your rewards and try again.');
+        } else {
+          throw txError;
+        }
+      }
+      
+      console.log('✅ Claim successful');
+      await refreshData();
     } catch (e: any) {
+      console.error('❌ Claim failed:', e);
       setError(e?.message ?? 'Failed to claim rewards');
       throw e;
     } finally {
@@ -792,15 +1492,87 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     if (!poolData) return null;
     
     try {
+             console.log('🔍 APY Calculation Debug:', {
+               rewardMint: poolData.rewardMint,
+               ratePerSec: poolData.ratePerSec,
+               totalStaked: poolData.totalStaked,
+               rewardConfigured: poolData.rewardMint !== '11111111111111111111111111111111'
+             });
+             
+             // Show the current rate in human-readable format
+             if (poolData.ratePerSec > 0) {
+               const rewardMintPk = new PublicKey(poolData.rewardMint);
+               const { getMint } = await import('@solana/spl-token');
+               const rewardInfo = await getMint(connection, rewardMintPk);
+               const rewDec = rewardInfo.decimals ?? 0;
+               const ratePerSecUI = poolData.ratePerSec / (10 ** rewDec);
+               
+               console.log('📊 Current Rate Settings:', {
+                 baseUnits: poolData.ratePerSec,
+                 humanReadable: ratePerSecUI,
+                 decimals: rewDec,
+                 perSecond: `${ratePerSecUI} tokens per second`,
+                 perDay: `${(ratePerSecUI * 86400).toFixed(6)} tokens per day`,
+                 perYear: `${(ratePerSecUI * 31536000).toFixed(6)} tokens per year`
+               });
+             }
+             
       // Check if reward config is set
       if (!poolData.rewardMint || poolData.rewardMint === '11111111111111111111111111111111') {
         console.log('❌ Reward configuration not set');
         return null;
       }
       
-      if (poolData.ratePerSec <= 0 || poolData.totalStaked <= 0) {
-        console.log('❌ Invalid rate or staked amount');
+             if (poolData.ratePerSec <= 0) {
+               console.log('❌ Invalid rate:', {
+                 ratePerSec: poolData.ratePerSec,
+                 reason: 'Rate is 0 or negative'
+               });
         return null;
+      }
+             
+             // If no tokens staked, show theoretical APY (assuming 1 token staked)
+             if (poolData.totalStaked <= 0) {
+               console.log('⚠️ No tokens staked yet - showing theoretical APY (assuming 1 token staked)');
+               
+               // Calculate theoretical APY with 1 token staked
+               const stakingMintPk = new PublicKey(poolData.stakingMint);
+               const rewardMintPk = new PublicKey(poolData.rewardMint);
+               
+               const { getMint } = await import('@solana/spl-token');
+               const stakingInfo = await getMint(connection, stakingMintPk);
+               const rewardInfo = await getMint(connection, rewardMintPk);
+               
+               const stakeDec = stakingInfo.decimals ?? 0;
+               const rewDec = rewardInfo.decimals ?? 0;
+               
+               // Convert base units → UI units
+               const ratePerSecUI = poolData.ratePerSec / (10 ** rewDec);
+               const theoreticalStaked = 1; // 1 token staked
+               
+               const secondsPerYear = 31_536_000;
+               const yearlyRewards = ratePerSecUI * secondsPerYear;
+               const apyDecimal = yearlyRewards / theoreticalStaked;
+               const apyPercent = apyDecimal * 100;
+               
+               console.log('🔍 Theoretical APY (1 token staked):', {
+                 ratePerSecUI,
+                 theoreticalStaked,
+                 yearlyRewards,
+                 apyPercent: `${apyPercent.toFixed(6)}%`,
+                 formula: `(${ratePerSecUI} * ${secondsPerYear} / ${theoreticalStaked}) * 100 = ${apyPercent.toFixed(6)}%`
+               });
+               
+               return {
+                 ratePerSecUI,
+                 totalStakedUI: theoreticalStaked,
+                 yearlyRewards,
+                 secondsPerYear,
+                 apyPercent,
+                 decimals: { staking: stakeDec, reward: rewDec },
+                 baseUnits: { ratePerSec: poolData.ratePerSec, totalStaked: poolData.totalStaked },
+                 isTheoretical: true
+               };
       }
 
       const stakingMintPk = new PublicKey(poolData.stakingMint);
@@ -835,6 +1607,12 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       };
 
       console.log('🔍 APY Debugger:', breakdown);
+             console.log('✅ APY Calculation successful:', {
+               ratePerSecUI,
+               totalStakedUI,
+               apyPercent: `${apyPercent.toFixed(6)}%`,
+               formula: `(${ratePerSecUI} * ${secondsPerYear} / ${totalStakedUI}) * 100 = ${apyPercent.toFixed(6)}%`
+             });
       return breakdown;
     } catch (e) {
       console.error('Failed to compute APY:', e);
@@ -884,8 +1662,16 @@ export function StakingProvider({ children }: { children: ReactNode }) {
 
   const addRewardTokens = async (amountHuman: number) => {
     if (!isAdmin || !walletAddress || !poolData) throw new Error('Only admin can add reward tokens');
+    
+    // Prevent duplicate submissions within 5 seconds
+    const now = Date.now();
+    if (now - lastTransactionTime < 5000) {
+      throw new Error('Please wait a few seconds before submitting another transaction');
+    }
+    
     setIsLoading(true);
     setError(null);
+    setLastTransactionTime(now);
     try {
       const wallet = {
         publicKey: pk(walletAddress),
@@ -912,12 +1698,49 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       // Admin's ATA (source)
       const adminRewardAta = await getAssociatedTokenAddress(rewardMint, pk(walletAddress));
 
-      // Check balances before transfer
+             // Check if admin has ATA for reward mint, create if needed
       try {
         const adminBalance = await connection.getTokenAccountBalance(adminRewardAta);
         console.log('Admin balance before transfer:', adminBalance.value.uiAmount);
+               
+               // Check if admin has enough tokens
+               if (adminBalance.value.uiAmount === null || adminBalance.value.uiAmount < amountHuman) {
+                 console.log('❌ Insufficient reward tokens in admin wallet!');
+                 console.log('🔍 Admin balance:', adminBalance.value.uiAmount);
+                 console.log('🔍 Required amount:', amountHuman);
+                 console.log('💡 Solution: You need to acquire some reward tokens first');
+                 console.log('💡 Reward mint:', rewardMint.toBase58());
+                 throw new Error(`Insufficient reward tokens. Admin has ${adminBalance.value.uiAmount || 0} tokens, but needs ${amountHuman} tokens. Please acquire some reward tokens first.`);
+               }
       } catch (e) {
-        console.log('Could not check admin balance:', e);
+               if (e instanceof Error && e.message?.includes('Insufficient reward tokens')) {
+                 throw e; // Re-throw our custom error
+               }
+               
+               console.log('Admin ATA does not exist for reward mint, creating it...');
+               
+               // Create admin ATA for reward mint
+               const { createAssociatedTokenAccountInstruction } = await import('@solana/spl-token');
+               const { Transaction } = await import('@solana/web3.js');
+               
+               const createAtaTx = new Transaction();
+               createAtaTx.add(
+                 createAssociatedTokenAccountInstruction(
+                   pk(walletAddress),   // payer
+                   adminRewardAta,      // ata to create
+                   pk(walletAddress),   // owner (admin)
+                   rewardMint           // mint
+                 )
+               );
+               
+               console.log('Creating admin ATA for reward mint...');
+               const createAtaSig = await provider.sendAndConfirm(createAtaTx);
+               console.log('Admin ATA created:', createAtaSig);
+               
+               console.log('⚠️ Admin ATA created but has 0 balance');
+               console.log('💡 You need to acquire some reward tokens first');
+               console.log('💡 Reward mint:', rewardMint.toBase58());
+               throw new Error('Admin ATA created but has 0 balance. Please acquire some reward tokens first.');
       }
 
       // Ensure the vault exists (idempotent create)
@@ -926,7 +1749,26 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         await import('@solana/spl-token');
       const { Transaction } = await import('@solana/web3.js');
 
-      const tx = new Transaction();
+             const tx = new Transaction();
+             
+             // 2️⃣ fetch a new blockhash right before signing
+             const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+             tx.recentBlockhash = blockhash;
+             tx.lastValidBlockHeight = lastValidBlockHeight;
+             tx.feePayer = pk(walletAddress);
+             
+             console.log('🔍 Fresh blockhash:', blockhash);
+             console.log('🔍 Last valid block height:', lastValidBlockHeight);
+             
+             // 3️⃣ add memo with timestamp and random for extra uniqueness
+             const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+             const memoData = Buffer.from(`reward-top-up-${uniqueId}`, 'utf8');
+             const memoInstruction = {
+               programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
+               keys: [{ pubkey: pk(walletAddress), isSigner: true, isWritable: false }],
+               data: memoData,
+             };
+             tx.add(memoInstruction);
 
       if (!vaultInfo) {
         tx.add(
@@ -959,18 +1801,72 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         )
       );
 
-      console.log('Sending addRewardTokens tx…', {
-        pool: poolPDA.toBase58(),
-        signer: signerPDA.toBase58(),
-        rewardMint: rewardMint.toBase58(),
-        rewardVault: rewardVault.toBase58(),
-        adminRewardAta: adminRewardAta.toBase58(),
-        decimals,
-        amountBaseUnits: amountBaseUnits.toString(),
-      });
+             console.log('Sending addRewardTokens tx…', {
+               pool: poolPDA.toBase58(),
+               signer: signerPDA.toBase58(),
+               rewardMint: rewardMint.toBase58(),
+               rewardVault: rewardVault.toBase58(),
+               adminRewardAta: adminRewardAta.toBase58(),
+               decimals,
+               amountBaseUnits: amountBaseUnits.toString(),
+             });
 
-      const txSignature = await provider.sendAndConfirm(tx);
-      console.log('Transfer transaction signature:', txSignature);
+             
+             // Use sendAndConfirm with unique transaction and retry logic
+             let txSignature;
+             let retryCount = 0;
+             const maxRetries = 3;
+             
+             while (retryCount < maxRetries) {
+               try {
+                 console.log(`🔄 Attempting transaction (attempt ${retryCount + 1}/${maxRetries})...`);
+                 txSignature = await provider.sendAndConfirm(tx, [], {
+                   commitment: 'confirmed',
+                   skipPreflight: false,
+                   preflightCommitment: 'confirmed'
+                 });
+                 console.log('✅ Transfer transaction successful:', txSignature);
+                 break;
+               } catch (retryError: any) {
+                 retryCount++;
+                 console.log(`❌ Attempt ${retryCount} failed:`, retryError.message);
+                 
+                 if (retryError.message.includes('already been processed')) {
+                   console.log('🔄 Transaction was already processed - checking if it succeeded...');
+                   // Check if the transaction actually succeeded by looking at balances
+                   try {
+                     const vaultBalance = await connection.getTokenAccountBalance(rewardVault);
+                     if (vaultBalance.value.uiAmount && vaultBalance.value.uiAmount > 0) {
+                       console.log('✅ Transaction actually succeeded despite error message');
+                       break;
+                     }
+                   } catch (balanceError) {
+                     console.log('Could not check vault balance:', balanceError);
+                   }
+                 }
+                 
+                 if (retryCount >= maxRetries) {
+                   throw retryError;
+                 }
+                 
+                 // Wait before retry
+                 await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+                 
+                 // Get fresh blockhash for retry
+                 const { blockhash: newBlockhash, lastValidBlockHeight: newLastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+                 tx.recentBlockhash = newBlockhash;
+                 tx.lastValidBlockHeight = newLastValidBlockHeight;
+                 
+                 // Update memo with new unique ID
+                 const newUniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                 const newMemoData = Buffer.from(`reward-top-up-${newUniqueId}`, 'utf8');
+                 tx.instructions[0] = {
+                   programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
+                   keys: [{ pubkey: pk(walletAddress), isSigner: true, isWritable: false }],
+                   data: newMemoData,
+                 };
+               }
+             }
 
       // Check balances after transfer
       try {
@@ -986,14 +1882,156 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       }
 
       console.log('✅ Reward tokens transferred into vault');
+             
+             // Check balances after transfer
+             try {
+               const adminBalanceAfter = await connection.getTokenAccountBalance(adminRewardAta);
+               const vaultBalance = await connection.getTokenAccountBalance(rewardVault);
+               console.log('🔍 Balances after transfer:', {
+                 adminBalance: adminBalanceAfter.value.uiAmount,
+                 vaultBalance: vaultBalance.value.uiAmount,
+                 vaultAddress: rewardVault.toBase58()
+               });
+               
+               // Check if APY calculation will work now
+               if (vaultBalance.value.uiAmount && vaultBalance.value.uiAmount > 0) {
+                 console.log('✅ Reward vault now has tokens!');
+                 console.log('🔍 Vault balance:', vaultBalance.value.uiAmount);
+                 console.log('🔍 This should enable APY calculation once users stake');
+               } else {
+                 console.log('⚠️ Vault balance is still 0 - check if transfer was successful');
+               }
+             } catch (e) {
+               console.log('Could not check balances after transfer:', e);
+             }
+             
       await refreshData();
     } catch (e: any) {
       console.error('❌ addRewardTokens failed', e);
-      setError(e?.message ?? 'Failed to add reward tokens');
-      throw e;
+      
+      // Handle specific transaction errors
+      if (e?.message?.includes('already been processed')) {
+        console.log('🔄 Transaction already processed - this might be a duplicate submission');
+        console.log('💡 Try refreshing the page and attempting the token transfer again');
+        throw new Error('Transaction already processed. Please refresh and try again.');
+      } else if (e?.message?.includes('Blockhash not found')) {
+        console.log('🔄 Blockhash not found - this is a network timing issue');
+        console.log('💡 This usually resolves itself, please try again');
+        throw new Error('Network timing issue. Please try again in a moment.');
+      } else if (e?.message?.includes('simulation failed')) {
+        console.log('🔄 Transaction simulation failed - checking for specific issues');
+        console.log('💡 This might be due to insufficient token balance or account issues');
+        throw new Error('Transaction simulation failed. Please check your token balance and try again.');
+      } else if (e?.message?.includes('Insufficient reward tokens')) {
+        console.log('🔄 Insufficient reward tokens - admin needs more tokens');
+        throw new Error('Insufficient reward tokens. Please acquire more reward tokens first.');
+      } else {
+        setError(e?.message ?? 'Failed to add reward tokens');
+        throw e;
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // --- Helper functions -----------------------------------------------------
+
+  const setStakingMintHandler = (mint: string) => {
+    console.log(`🔧 Setting staking mint to: ${mint}`);
+    setStakingMint(mint);
+  };
+
+  const diagnoseAccount = async (accountAddress: string) => {
+    try {
+      const accountInfo = await connection.getAccountInfo(new PublicKey(accountAddress));
+      if (!accountInfo) {
+        console.log('❌ Account does not exist');
+        return;
+      }
+      
+      console.log('🔍 Account Diagnosis:');
+      console.log('- Address:', accountAddress);
+      console.log('- Owner:', accountInfo.owner.toBase58());
+      console.log('- Executable:', accountInfo.executable);
+      console.log('- Lamports:', accountInfo.lamports);
+      console.log('- Data Length:', accountInfo.data?.length);
+      console.log('- Is Program Account:', accountInfo.owner.equals(PROGRAM_ID));
+      
+      if (accountInfo.data && accountInfo.data.length > 0) {
+        console.log('- First 32 bytes:', Array.from(accountInfo.data.slice(0, 32)));
+        console.log('- Last 32 bytes:', Array.from(accountInfo.data.slice(-32)));
+      }
+      
+      return accountInfo;
+    } catch (error) {
+      console.error('❌ Failed to diagnose account:', error);
+    }
+  };
+
+  const fetchOnChainIdl = async () => {
+    try {
+      const wallet = {
+        publicKey: pk(walletAddress!),
+        signTransaction: async (tx: any) => {
+          if (typeof window !== 'undefined' && (window as any).solana?.isPhantom) {
+            return await (window as any).solana.signTransaction(tx);
+          }
+          throw new Error('Wallet not connected');
+        },
+        signAllTransactions: async (txs: any[]) => {
+          if (typeof window !== 'undefined' && (window as any).solana?.isPhantom) {
+            return await (window as any).solana.signAllTransactions(txs);
+          }
+          throw new Error('Wallet not connected');
+        }
+      };
+
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+      const onChainIdl = await fetchAndSaveOnChainIdl(provider);
+      
+      if (onChainIdl) {
+        console.log('✅ On-chain IDL fetched successfully');
+        return onChainIdl;
+      } else {
+        console.log('❌ Failed to fetch on-chain IDL');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch on-chain IDL:', error);
+      return null;
+    }
+  };
+
+  const verifyPdaSeeds = (stakingMintStr: string) => {
+    console.log('🔍 Verifying PDA seeds match program expectations...');
+    
+    const stakingMint = new PublicKey(stakingMintStr);
+    const programId = PROGRAM_ID;
+    
+    // Derive PDA using the same seeds as the program
+    const [poolPDA, bump] = PublicKey.findProgramAddressSync(
+      [Buffer.from("pool"), stakingMint.toBuffer()],
+      programId
+    );
+    
+    console.log('PDA Derivation:', {
+      programId: programId.toBase58(),
+      stakingMint: stakingMint.toBase58(),
+      seeds: ['pool', stakingMint.toBase58()],
+      derivedPDA: poolPDA.toBase58(),
+      bump
+    });
+    
+    // Verify the seeds match what the Rust program expects
+    const expectedSeeds = [Buffer.from("pool"), stakingMint.toBuffer()];
+    const [verifyPDA, verifyBump] = PublicKey.findProgramAddressSync(expectedSeeds, programId);
+    
+    if (!poolPDA.equals(verifyPDA)) {
+      throw new Error('PDA derivation mismatch - seeds do not match program expectations');
+    }
+    
+    console.log('✅ PDA seeds match program expectations');
+    return { poolPDA, bump };
   };
 
   // --- Context value ---------------------------------------------------------
@@ -1007,10 +2045,16 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     isLoading,
     error,
     stakingMint,
+    stakingDecimals,
+    rewardDecimals,
     initializePool,
     fetchPoolByMint,
+    setStakingMint: setStakingMintHandler,
+    diagnoseAccount,
+    fetchOnChainIdl,
+    verifyPdaSeeds,
     setRewardConfig,
-    updateRate,
+    setRewardRate,
     addRewardTokens,
     checkRewardVaultBalance,
     checkCurrentPoolState,

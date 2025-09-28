@@ -3,11 +3,11 @@
 import { useStaking } from '../contexts/StakingContext';
 
 export default function DashboardCards() {
-  const { poolData, userData, stakingMint } = useStaking();
+  const { poolData, userData, stakingMint, stakingDecimals, rewardDecimals } = useStaking();
 
-  // Helper function to format token amounts (assuming 9 decimals like SOL)
-  const formatTokenAmount = (amount: number, decimals: number = 9) => {
-    return (amount / Math.pow(10, decimals)).toFixed(6);
+  // Helper function to format token amounts using dynamic decimals
+  const formatTokenAmount = (amount: number, decimals: number = stakingDecimals) => {
+    return (amount / Math.pow(10, decimals)).toFixed(0);
   };
 
   // Log APY calculation details
