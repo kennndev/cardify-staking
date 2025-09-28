@@ -218,6 +218,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         const pool = await (program.account as any).pool.fetch(poolPDA);
         
         console.log('Raw pool data from blockchain:', {
+          stakingMint: pool.stakingMint?.toBase58?.() ?? 'undefined',
           rewardRatePerSec: pool.rewardRatePerSec?.toString?.() ?? 'undefined',
           rewardRatePerSecNumber: pool.rewardRatePerSec?.toNumber?.() ?? 0,
           rewardMint: pool.rewardMint?.toBase58?.() ?? 'undefined',
