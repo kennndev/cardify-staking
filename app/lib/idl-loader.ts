@@ -6,7 +6,7 @@ import idlData from '../idl/simple_staking.json';
 
 // Program ID as a PublicKey
 export const PROGRAM_ID: PublicKey = pk(
-  process.env.NEXT_PUBLIC_PROGRAM_ID || ""
+  process.env.NEXT_PUBLIC_PROGRAM_ID || "CiDK1DgGmfdWLHsVxgJuzGmqfVge1cZFvV5CEGizGWU"
 );
 
 // Helper function to fetch and save on-chain IDL for debugging
