@@ -30,11 +30,11 @@ export function poolPda(programId: string | PublicKey, stakingMint: string | Pub
   return PublicKey.findProgramAddressSync([Buffer.from("pool"), mint.toBuffer()], pid)[0];
 }
 
-/** signer = PDA("signer", pool) */
+/** signer = PDA("pool_signer", pool) */
 export function signerPda(programId: string | PublicKey, pool: string | PublicKey): PublicKey {
   const pid = pk(programId);
   const poolPk = pk(pool);
-  return PublicKey.findProgramAddressSync([Buffer.from("signer"), poolPk.toBuffer()], pid)[0];
+  return PublicKey.findProgramAddressSync([Buffer.from("pool_signer"), poolPk.toBuffer()], pid)[0];
 }
 
 /** user = PDA("user", pool, owner) */
