@@ -100,7 +100,7 @@ export async function initializeOnly(stakingMintStr: string, wallet: any) {
         admin: provider.wallet.publicKey,
         stakingMint,
         pool,            // PDA (will be created by program)
-        signer,          // PDA (no creation; just used as authority)
+        poolSigner: signer,          // PDA (no creation; just used as authority)
         stakingVault,    // ATA (will be created by program)
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
