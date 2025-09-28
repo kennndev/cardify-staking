@@ -75,6 +75,19 @@ export default function GamesSection() {
   // Calculate user's staked amount in base units
   const userStakedAmount = userData?.staked || 0;
 
+  // Debug logging
+  console.log('🎮 Games Section Debug:', {
+    userStakedAmount,
+    stakingDecimals,
+    userStakedFormatted: userStakedAmount / Math.pow(10, stakingDecimals),
+    games: games.map(g => ({
+      name: g.name,
+      requirement: g.stakingRequirement,
+      requirementFormatted: g.stakingRequirement / Math.pow(10, stakingDecimals),
+      canAccess: userStakedAmount >= g.stakingRequirement
+    }))
+  });
+
   // Helper function to check if user can access a game
   const canAccessGame = (game: Game): boolean => {
     if (!game.isAvailable) return false;
