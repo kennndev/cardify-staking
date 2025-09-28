@@ -7,7 +7,7 @@ import { PublicKey } from "@solana/web3.js";
  * Run this before initializing to ensure compatibility
  */
 
-const PROGRAM_ID = new PublicKey("64vdAWZhKCV3fbmWGrZ6QtJG8c3wGEaQThqxV5xxNmCo");
+const PROGRAM_ID = new PublicKey("CiDK1DgGmfdWLHsVxgJuzGmqfFvge1cZFvV5CEGizGWU");
 
 // Test with your staking mint
 const STAKING_MINT = new PublicKey("2VkcySsgoVMitU7wo81qqGD1QBPX1Bi3ziPVvQXwyMGY");

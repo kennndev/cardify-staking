@@ -2,7 +2,7 @@
 export const ENV = {
   // Solana Configuration
   SOLANA_RPC_URL: process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com',
-  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || '11111111111111111111111111111111', // Default to System Program if not set
+  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'CiDK1DgGmfdWLHsVxgJuzGmqfFvge1cZFvV5CEGizGWU', // New program ID
   ADMIN_WALLET: process.env.NEXT_PUBLIC_ADMIN_WALLET || '39NqKccVeTcND38fJWDU1FE7guFk4nCznJ3WadVxyL5N',
   
   // Network Configuration
