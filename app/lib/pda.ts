@@ -30,13 +30,13 @@ export function poolPda(programId: string | PublicKey, stakingMint: string | Pub
   return PublicKey.findProgramAddressSync([Buffer.from("pool"), mint.toBuffer()], pid)[0];
 }
 
-/** signer = PDA("pool_signer", pool) - with legacy fallback */
+/** signer = PDA("signer", pool) - legacy seed for existing pools */
 export function signerPda(programId: string | PublicKey, pool: string | PublicKey): PublicKey {
   const pid = pk(programId);
   const poolPk = pk(pool);
   
-  // Try new seed first (for new pools)
-  return PublicKey.findProgramAddressSync([Buffer.from("pool_signer"), poolPk.toBuffer()], pid)[0];
+  // Use legacy seed for existing pools
+  return PublicKey.findProgramAddressSync([Buffer.from("signer"), poolPk.toBuffer()], pid)[0];
 }
 
 /** Legacy helper for old pools that were initialized with "signer" seed */
