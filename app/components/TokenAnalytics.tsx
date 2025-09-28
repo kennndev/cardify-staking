@@ -1,22 +1,7 @@
 'use client';
 
-import { useStaking } from '../contexts/StakingContext';
-
 export default function TokenAnalytics() {
-  const { stakingMint } = useStaking();
 
-
-
-  if (!stakingMint) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-8 text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">Token Analytics</h1>
-          <p className="text-gray-300">Connect to a staking pool to view token analytics.</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="h-screen flex flex-col">
