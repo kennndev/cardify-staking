@@ -25,7 +25,7 @@ const games: Game[] = [
     icon: '🛡️',
     component: CyberDefense,
     isAvailable: true,
-    stakingRequirement: 5_000_000, // 5 million tokens (base units)
+    stakingRequirement: 5_000_000_000_000, // 5 million tokens (base units for 6-decimal token)
     tier: 1,
   },
   {
@@ -35,7 +35,7 @@ const games: Game[] = [
     icon: '💎',
     component: PuzzleMatch,
     isAvailable: true,
-    stakingRequirement: 6_000_000, // 6 million tokens (base units)
+    stakingRequirement: 6_000_000_000_000, // 6 million tokens (base units for 6-decimal token)
     tier: 2,
   },
   {
@@ -45,7 +45,7 @@ const games: Game[] = [
     icon: '🫧',
     component: PopPop,
     isAvailable: true,
-    stakingRequirement: 7_000_000, // 7 million tokens (base units)
+    stakingRequirement: 7_000_000_000_000, // 7 million tokens (base units for 6-decimal token)
     tier: 3,
   },
   {
@@ -96,9 +96,9 @@ export default function GamesSection() {
 
   // Helper function to get user's current tier
   const getUserTier = (): number => {
-    if (userStakedAmount >= 7_000_000) return 3; // All games
-    if (userStakedAmount >= 6_000_000) return 2; // Cyber Defense + Puzzle
-    if (userStakedAmount >= 5_000_000) return 1; // Cyber Defense only
+    if (userStakedAmount >= 7_000_000_000_000) return 3; // All games (7M tokens)
+    if (userStakedAmount >= 6_000_000_000_000) return 2; // Cyber Defense + Puzzle (6M tokens)
+    if (userStakedAmount >= 5_000_000_000_000) return 1; // Cyber Defense only (5M tokens)
     return 0; // No access
   };
 
