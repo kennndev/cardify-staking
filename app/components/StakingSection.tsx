@@ -275,7 +275,7 @@ export default function StakingSection() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Pending Rewards:</span>
-                <span className="text-green-400 font-medium">{formatToken(calculatePendingRewards() * Math.pow(10, rewardDecimals), rewardDecimals, 0, 8)}</span>
+                <span className="text-green-400 font-medium">{formatToken(Number(userData.unpaidRewards || 0), rewardDecimals, 0, 8)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300 flex items-center">
