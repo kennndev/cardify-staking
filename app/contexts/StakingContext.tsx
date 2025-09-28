@@ -568,7 +568,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
           console.log('Fetching existing pool at:', poolPDA.toBase58());
           
           // Load the existing pool data
-          await refreshData();
+          await fetchPoolByMint(stakingMint);
           console.log('✅ Existing pool data loaded successfully');
           return; // Success - pool data is now loaded
         } catch (loadError) {
