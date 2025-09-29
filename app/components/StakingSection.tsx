@@ -37,6 +37,11 @@ export default function StakingSection() {
       return;
     }
     
+    if (poolData?.paused) {
+      alert('Pool is paused - staking is temporarily disabled');
+      return;
+    }
+    
     if (isLoading) {
       console.log('⚠️ Transaction already in progress, ignoring click');
       return;
@@ -212,6 +217,18 @@ export default function StakingSection() {
         </div>
       )}
 
+      {poolData?.paused && (
+        <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 mb-6">
+          <div className="flex items-center justify-center space-x-2">
+            <span className="text-yellow-400 text-lg">⏸️</span>
+            <div className="text-center">
+              <p className="text-yellow-300 font-medium">Pool is Paused</p>
+              <p className="text-yellow-200 text-sm">New stakes are disabled. Claims and unstakes are still available.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
         {/* Pool Stats */}
         <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-4 md:p-6 mobile-card">
@@ -310,14 +327,19 @@ export default function StakingSection() {
             </div>
             <button
               type="submit"
-              disabled={isLoading || !poolData}
+              disabled={isLoading || !poolData || poolData?.paused}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 touch-target"
             >
-              {isLoading ? 'Staking...' : !poolData ? 'Pool not initialized' : 'Stake Tokens'}
+              {isLoading ? 'Staking...' : !poolData ? 'Pool not initialized' : poolData.paused ? '⏸️ Pool Paused' : 'Stake Tokens'}
             </button>
             {!poolData && (
               <p className="text-red-400 text-sm mt-2">
                 Pool not initialized. Please initialize the pool first in the Admin section.
+              </p>
+            )}
+            {poolData?.paused && (
+              <p className="text-yellow-400 text-sm mt-2">
+                ⚠️ Pool is paused - staking is temporarily disabled. You can still claim rewards and unstake.
               </p>
             )}
           </form>

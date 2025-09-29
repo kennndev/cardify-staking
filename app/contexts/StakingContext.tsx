@@ -52,6 +52,7 @@ interface PoolData {
   accScaled: string;       // big number-safe
   lastUpdateTs: number;
   ratePerSec: number;
+  paused: boolean;
   bump: number;
   signerBump: number;
 }
@@ -84,6 +85,7 @@ interface StakingContextType {
   verifyPdaSeeds: (stakingMintStr: string) => { poolPDA: PublicKey; bump: number };
   setRewardConfig: (rewardMint: string, ratePerSec: number) => Promise<void>;
   setRewardRate: (ratePerSec: string | number) => Promise<void>;
+  setPaused: (paused: boolean) => Promise<void>;
   addRewardTokens: (amount: number) => Promise<void>;
   checkRewardVaultBalance: () => Promise<number>;
   checkCurrentPoolState: () => Promise<void>;
@@ -237,6 +239,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
           accScaled: pool.accScaled?.toString?.() ?? '0',
           lastUpdateTs: pool.lastUpdateTs?.toNumber?.() ?? 0,
           ratePerSec: pool.rewardRatePerSec?.toNumber?.() ?? 0,  // <-- Fixed: was pool.ratePerSec
+          paused: pool.paused ?? false,
           bump: pool.bump ?? 0,
           signerBump: pool.signerBump ?? 0,
         });
@@ -672,6 +675,64 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         throw new Error('Transaction simulation failed. Please check your admin permissions and try again.');
       } else {
         setError(e?.message ?? 'Failed to update rate');
+        throw e;
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const setPaused = async (paused: boolean) => {
+    if (!isAdmin || !walletAddress || !poolData) throw new Error('Only admin can pause/unpause pool');
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const wallet = {
+        publicKey: pk(walletAddress),
+        signTransaction: async (tx: any) => {
+          if ((window as any).solana?.isPhantom) return await (window as any).solana.signTransaction(tx);
+          throw new Error('Wallet not connected');
+        },
+        signAllTransactions: async (txs: any[]) => {
+          if ((window as any).solana?.isPhantom) return await (window as any).solana.signAllTransactions(txs);
+          throw new Error('Wallet not connected');
+        },
+      };
+
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+      const program = await loadProgram(provider);
+
+      const poolPDA = pk(poolData.poolAddress);
+
+      console.log(`🔄 ${paused ? 'Pausing' : 'Unpausing'} pool...`);
+      console.log('Pool PDA:', poolPDA.toBase58());
+
+      const sig = await program.methods
+        .setPaused(paused)
+        .accounts({
+          pool: poolPDA,
+          admin: pk(walletAddress),
+        })
+        .rpc({ 
+          commitment: 'confirmed',
+          skipPreflight: true
+        });
+
+      console.log(`✅ Pool ${paused ? 'paused' : 'unpaused'} successfully:`, sig);
+      await new Promise(r => setTimeout(r, 1200));
+      await refreshData();
+    } catch (e: any) {
+      console.error(`❌ Failed to ${paused ? 'pause' : 'unpause'} pool:`, e);
+      
+      // Handle specific transaction errors
+      if (e?.message?.includes('already been processed')) {
+        console.log('🔄 Transaction already processed - treating as success');
+        console.log(`✅ Pool ${paused ? 'paused' : 'unpaused'} successfully (transaction was already processed)`);
+        await refreshData();
+        return;
+      } else {
+        setError(e?.message ?? `Failed to ${paused ? 'pause' : 'unpause'} pool`);
         throw e;
       }
     } finally {
@@ -2044,6 +2105,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     verifyPdaSeeds,
     setRewardConfig,
     setRewardRate,
+    setPaused,
     addRewardTokens,
     checkRewardVaultBalance,
     checkCurrentPoolState,

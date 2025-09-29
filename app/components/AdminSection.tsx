@@ -7,7 +7,7 @@ import TicketList from './TicketList';
 import WalletAddress from './WalletAddress';
 
 export default function AdminSection() {
-  const { isAdmin, poolData, isLoading, error, stakingMint, stakingDecimals, initializePool, fetchPoolByMint, setStakingMint, setRewardConfig, addRewardTokens, setRewardRate } = useStaking();
+  const { isAdmin, poolData, isLoading, error, stakingMint, stakingDecimals, initializePool, fetchPoolByMint, setStakingMint, setRewardConfig, addRewardTokens, setRewardRate, setPaused } = useStaking();
   const [stakingMintInput, setStakingMintInput] = useState('');
   const [rewardMint, setRewardMint] = useState('');
   const [ratePerSec, setRatePerSec] = useState('');
@@ -17,6 +17,17 @@ export default function AdminSection() {
   // Helper function to format token amounts using dynamic decimals
   const formatTokenAmount = (amount: number, decimals: number = stakingDecimals) => {
     return (amount / Math.pow(10, decimals)).toFixed(0);
+  };
+
+  const handlePauseToggle = async () => {
+    if (!poolData) return;
+    
+    try {
+      await setPaused(!poolData.paused);
+      alert(`Pool ${poolData.paused ? 'unpaused' : 'paused'} successfully!`);
+    } catch (err) {
+      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
   };
   
   // Ticket management state
@@ -263,6 +274,32 @@ export default function AdminSection() {
                   {new Date(poolData.lastUpdateTs * 1000).toLocaleString()}
                 </span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-300">Status:</span>
+                <span className={`font-medium ${poolData.paused ? 'text-yellow-400' : 'text-green-400'}`}>
+                  {poolData.paused ? '⏸️ Paused' : '▶️ Active'}
+                </span>
+              </div>
+            </div>
+            
+            {/* Pause/Unpause Controls */}
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <button
+                onClick={handlePauseToggle}
+                disabled={isLoading}
+                className={`w-full font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 ${
+                  poolData.paused 
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                    : 'bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white'
+                }`}
+              >
+                {isLoading ? 'Processing...' : poolData.paused ? '▶️ Unpause Pool' : '⏸️ Pause Pool'}
+              </button>
+              {poolData.paused && (
+                <p className="text-yellow-300 text-xs mt-2 text-center">
+                  Pool is paused - new stakes blocked, claims & unstakes allowed
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-gray-400">Pool not initialized</p>
