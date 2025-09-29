@@ -107,36 +107,6 @@ export default function StakingSection() {
     }
   };
 
-  const handleCheckRewardBalance = async () => {
-    if (!walletAddress || !poolData) {
-      alert('Please connect your wallet and ensure pool is loaded');
-      return;
-    }
-    
-    try {
-      const { getAssociatedTokenAddress } = await import('@solana/spl-token');
-      const { PublicKey } = await import('@solana/web3.js');
-      
-      const userRewardAta = await getAssociatedTokenAddress(
-        new PublicKey(poolData.rewardMint),
-        new PublicKey(walletAddress)
-      );
-      
-      const balance = await connection.getTokenAccountBalance(userRewardAta);
-      const uiAmount = Number(balance.value.amount) / Math.pow(10, rewardDecimals);
-      
-      console.log('💰 Current reward balance:', {
-        baseUnits: balance.value.amount,
-        uiAmount: uiAmount,
-        decimals: rewardDecimals
-      });
-      
-      alert(`Current reward balance: ${uiAmount.toFixed(8)} tokens`);
-    } catch (err) {
-      console.error('❌ Failed to check reward balance:', err);
-      alert(`Error checking balance: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  };
 
 
 
@@ -316,13 +286,6 @@ export default function StakingSection() {
               className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 touch-target"
             >
               {isLoading ? 'Refreshing...' : 'Refresh Data'}
-            </button>
-            <button
-              onClick={handleCheckRewardBalance}
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 touch-target mt-2"
-            >
-              Check Reward Balance
             </button>
           </div>
         </div>
