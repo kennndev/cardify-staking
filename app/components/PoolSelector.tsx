@@ -19,22 +19,7 @@ export default function PoolSelector() {
   };
 
   if (poolData) {
-    return (
-      <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-4 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-green-300 font-medium">Pool Connected</h3>
-            <p className="text-green-200 text-sm">
-              Staking Mint: {stakingMint?.slice(0, 8)}...{stakingMint?.slice(-8)}
-            </p>
-            <p className="text-green-200 text-sm">
-              Total Staked: {poolData.totalStaked.toLocaleString()}
-            </p>
-          </div>
-          <div className="text-green-400">✅</div>
-        </div>
-      </div>
-    );
+    return null; // Hide the green debugging box
   }
 
   return (
