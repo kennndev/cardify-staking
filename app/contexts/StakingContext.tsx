@@ -1318,43 +1318,17 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       // Get reward vault (from pool data)
       const rewardVault = pk(poolData.rewardVault);
       
-      // Get user's reward ATA
-      const userRewardAta = await getAssociatedTokenAddress(
-        pk(poolData.rewardMint),
-        pk(walletAddress)
+      // Get or create user's reward ATA (idempotent - never fails if exists)
+      console.log('🔄 Ensuring user reward ATA exists...');
+      const userRewardAtaAccount = await getOrCreateAssociatedTokenAccount(
+        connection,
+        wallet as any,          // payer / signer
+        pk(poolData.rewardMint), // mint
+        pk(walletAddress)        // owner
       );
       
-      // Check if user's reward ATA exists, create it if it doesn't
-      try {
-        const ataInfo = await connection.getAccountInfo(userRewardAta);
-        if (!ataInfo) {
-          console.log('🔄 User reward ATA does not exist, creating it...');
-          const createAtaIx = createAssociatedTokenAccountInstruction(
-            pk(walletAddress), // payer
-            userRewardAta, // ata
-            pk(walletAddress), // owner
-            pk(poolData.rewardMint) // mint
-          );
-          
-          // Create the ATA with fresh blockhash to prevent signature collisions
-          const createTx = new Transaction().add(createAtaIx);
-          const { blockhash: freshBlockhash } = await connection.getLatestBlockhash('confirmed');
-          createTx.recentBlockhash = freshBlockhash;
-          createTx.feePayer = pk(walletAddress);
-          
-          await provider.sendAndConfirm(createTx, [], {
-            commitment: 'confirmed',
-            skipPreflight: false,
-            preflightCommitment: 'confirmed'
-          });
-          console.log('✅ User reward ATA created successfully');
-        } else {
-          console.log('✅ User reward ATA already exists');
-        }
-      } catch (ataError: any) {
-        console.error('❌ Error checking/creating user reward ATA:', ataError);
-        throw new Error(`Failed to ensure user reward ATA exists: ${ataError.message}`);
-      }
+      const userRewardAta = userRewardAtaAccount.address;
+      console.log('✅ User reward ATA ready:', userRewardAta.toBase58());
       
       console.log('Claim accounts:', {
         owner: walletAddress,
