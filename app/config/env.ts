@@ -1,19 +1,19 @@
 // Environment Configuration
 export const ENV = {
   // Solana Configuration
-  SOLANA_RPC_URL: process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com',
-  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID || 'CiDK1DgGmfdWLHsVxgJuzGmqfVge1cZFvV5CEGizGWU',
-  ADMIN_WALLET: process.env.NEXT_PUBLIC_ADMIN_WALLET || '39NqKccVeTcND38fJWDU1FE7guFk4nCznJ3WadVxyL5N',
+  SOLANA_RPC_URL: process.env.NEXT_PUBLIC_SOLANA_RPC_URL!,
+  PROGRAM_ID: process.env.NEXT_PUBLIC_PROGRAM_ID!,
+  ADMIN_WALLET: process.env.NEXT_PUBLIC_ADMIN_WALLET!,
   
   // Network Configuration
-  NETWORK: process.env.NEXT_PUBLIC_NETWORK || 'devnet',
+  NETWORK: process.env.NEXT_PUBLIC_NETWORK!,
   
   // Token Configuration
-  STAKING_MINT: process.env.NEXT_PUBLIC_STAKING_MINT || '2VkcySsgoVMitU7wo81qqGD1QBPX1Bi3ziPVvQXwyMGY',
+  STAKING_MINT: process.env.NEXT_PUBLIC_STAKING_MINT!,
   REWARD_MINT: process.env.NEXT_PUBLIC_REWARD_MINT || '',
   
   // Pool Configuration (for debugging/verification)
-  POOL_PDA: process.env.NEXT_PUBLIC_POOL_PDA || 'EQM8GKuntXZapgmXwT9STQeSWhnS2AuDW3dbkS6azdcG',
+  POOL_PDA: process.env.NEXT_PUBLIC_POOL_PDA!,
   
   // App Configuration
   APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'Solana Staking Dashboard',
