@@ -2,12 +2,11 @@ import { AnchorProvider, Program, Idl } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { pk } from "./pda";
 import { normalizeIdlTypes } from "../utils/idl-normalize";
+import { ENV } from "../config/env";
 import idlData from '../idl/simple_staking.json';
 
 // Program ID as a PublicKey
-export const PROGRAM_ID: PublicKey = pk(
-  process.env.NEXT_PUBLIC_PROGRAM_ID || "CiDK1DgGmfdWLHsVxgJuzGmqfVge1cZFvV5CEGizGWU"
-);
+export const PROGRAM_ID: PublicKey = pk(ENV.PROGRAM_ID);
 
 // Helper function to fetch and save on-chain IDL for debugging
 export async function fetchAndSaveOnChainIdl(provider: AnchorProvider, outputPath?: string) {

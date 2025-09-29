@@ -1,4 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
+import { ENV } from "../config/env";
 
 // Debug function to show how to derive the pool PDA
 export function debugPoolDerivation(stakingMint: string, programId: string) {
@@ -26,10 +27,7 @@ export function debugPoolDerivation(stakingMint: string, programId: string) {
   };
 }
 
-// Test with your specific values
+// Test with environment values
 export function testYourPool() {
-  const programId = "CiDK1DgGmfdWLHsVxgJuzGmqfFvge1cZFvV5CEGizGWU";
-  const stakingMint = "2VkcySsgoVMitU7wo81qqGD1QBPX1Bi3ziPVvQXwyMGY";
-  
-  return debugPoolDerivation(stakingMint, programId);
+  return debugPoolDerivation(ENV.STAKING_MINT, ENV.PROGRAM_ID);
 }

@@ -1,8 +1,9 @@
 // Quick verification script for pool-signer PDA
 import { PublicKey } from "@solana/web3.js";
+import { ENV } from "../app/config/env";
 
-const PROGRAM_ID = new PublicKey("CiDK1DgGmfdWLHsVxgJuzGmqfVge1cZFvV5CEGizGWU");
-const POOL_PDA = new PublicKey("EQM8GKuntXZapgmXwT9STQeSWhnS2AuDW3dbkS6azdcG");
+const PROGRAM_ID = new PublicKey(ENV.PROGRAM_ID);
+const POOL_PDA = new PublicKey(ENV.POOL_PDA);
 
 console.log("🔍 Verifying pool-signer PDA derivation...");
 console.log(`Program ID: ${PROGRAM_ID.toBase58()}`);
