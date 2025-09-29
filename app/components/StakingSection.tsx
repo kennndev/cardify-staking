@@ -246,7 +246,7 @@ export default function StakingSection() {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-300">Total Staked:</span>
-                <span className="text-white font-medium">{poolData.totalStaked.toLocaleString()}</span>
+                <span className="text-white font-medium">{formatTokenAmount(poolData.totalStaked).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Reward Rate:</span>

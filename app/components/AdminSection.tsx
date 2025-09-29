@@ -7,12 +7,17 @@ import TicketList from './TicketList';
 import WalletAddress from './WalletAddress';
 
 export default function AdminSection() {
-  const { isAdmin, poolData, isLoading, error, stakingMint, initializePool, fetchPoolByMint, setStakingMint, setRewardConfig, addRewardTokens, setRewardRate } = useStaking();
+  const { isAdmin, poolData, isLoading, error, stakingMint, stakingDecimals, initializePool, fetchPoolByMint, setStakingMint, setRewardConfig, addRewardTokens, setRewardRate } = useStaking();
   const [stakingMintInput, setStakingMintInput] = useState('');
   const [rewardMint, setRewardMint] = useState('');
   const [ratePerSec, setRatePerSec] = useState('');
   const [rewardAmount, setRewardAmount] = useState('');
   const [newRewardRate, setNewRewardRate] = useState('');
+  
+  // Helper function to format token amounts using dynamic decimals
+  const formatTokenAmount = (amount: number, decimals: number = stakingDecimals) => {
+    return (amount / Math.pow(10, decimals)).toFixed(0);
+  };
   
   // Ticket management state
   const [allTickets, setAllTickets] = useState<Ticket[]>([]);
@@ -240,7 +245,7 @@ export default function AdminSection() {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-300">Total Staked:</span>
-                <span className="text-white font-medium">{poolData.totalStaked.toLocaleString()}</span>
+                <span className="text-white font-medium">{formatTokenAmount(poolData.totalStaked).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Reward Rate:</span>
