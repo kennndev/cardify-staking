@@ -68,9 +68,22 @@ export default function StakingSection() {
       return;
     }
     
+    // Check if user has pending rewards and warn them
+    const pendingRewards = liveRewards?.pendingUI || 0;
+    if (pendingRewards > 0) {
+      const confirmUnstake = confirm(
+        `⚠️ You have ${pendingRewards.toFixed(6)} pending rewards.\n\n` +
+        `Unstaking will automatically claim these rewards first to preserve them.\n\n` +
+        `Do you want to continue?`
+      );
+      if (!confirmUnstake) {
+        return;
+      }
+    }
+    
     try {
       await unstake(parseFloat(unstakeAmount));
-      alert('Unstaked successfully!');
+      alert('Unstaked successfully! Your rewards were automatically claimed.');
       setUnstakeAmount('');
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -367,6 +380,9 @@ export default function StakingSection() {
             >
               {isLoading ? 'Unstaking...' : 'Unstake Tokens'}
             </button>
+            <p className="text-blue-300 text-xs mt-2 text-center">
+              💡 Unstaking will automatically claim your pending rewards first
+            </p>
           </form>
         </div>
       </div>
