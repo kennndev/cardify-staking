@@ -1,9 +1,13 @@
 'use client';
 
 import { useStaking } from '../contexts/StakingContext';
+import { usePendingRewards } from '../hooks/usePendingRewards';
 
 export default function DashboardCards() {
   const { poolData, userData, stakingMint, stakingDecimals, rewardDecimals } = useStaking();
+  
+  // Calculate live pending rewards and APY
+  const liveRewards = usePendingRewards(poolData, userData);
 
   // Helper function to format token amounts using dynamic decimals
   const formatTokenAmount = (amount: number, decimals: number = stakingDecimals) => {
@@ -31,9 +35,7 @@ export default function DashboardCards() {
   const cards = [
     {
       title: 'APY RATE',
-      value: poolData && poolData.totalStaked > 0 ? 
-        `${((poolData.ratePerSec || 0) * 31536000 / poolData.totalStaked * 100).toFixed(2)}%` : 
-        '0%',
+      value: liveRewards ? `${liveRewards.apy.toFixed(2)}%` : '0%',
       subtitle: poolData ? `Rate: ${poolData.ratePerSec || 0}/sec` : 'ANNUAL PERCENTAGE YIELD',
       icon: '📈',
       color: 'from-yellow-400 to-orange-500',

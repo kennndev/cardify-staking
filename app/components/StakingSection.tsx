@@ -2,11 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { useStaking } from '../contexts/StakingContext';
+import { usePendingRewards } from '../hooks/usePendingRewards';
 import PoolSelector from './PoolSelector';
 import { formatToken } from '../utils/format';
 
 export default function StakingSection() {
   const { walletAddress, poolData, userData, isLoading, error, stake, unstake, claim, refreshData, stakingDecimals, rewardDecimals, connection } = useStaking();
+  
+  // Calculate live pending rewards
+  const liveRewards = usePendingRewards(poolData, userData);
   
   // Helper function to format token amounts using dynamic decimals
   const formatTokenAmount = (amount: number, decimals: number = stakingDecimals) => {
@@ -275,7 +279,9 @@ export default function StakingSection() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Pending Rewards:</span>
-                <span className="text-green-400 font-medium">{formatToken(Number(userData.unpaidRewards || 0), rewardDecimals, 0, 8)}</span>
+                <span className="text-green-400 font-medium">
+                  {liveRewards ? liveRewards.pendingUI.toFixed(6) : '0.000000'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300 flex items-center">
