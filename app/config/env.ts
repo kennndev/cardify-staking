@@ -12,9 +12,6 @@ export const ENV = {
   STAKING_MINT: process.env.NEXT_PUBLIC_STAKING_MINT!,
   REWARD_MINT: process.env.NEXT_PUBLIC_REWARD_MINT || '',
   
-  // Pool Configuration (for debugging/verification)
-  POOL_PDA: process.env.NEXT_PUBLIC_POOL_PDA!,
-  
   // App Configuration
   APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'Solana Staking Dashboard',
   APP_DESCRIPTION: process.env.NEXT_PUBLIC_APP_DESCRIPTION || 'Professional Solana staking dashboard for monitoring and managing your staked tokens',
