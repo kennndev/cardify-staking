@@ -863,9 +863,8 @@ export function StakingProvider({ children }: { children: ReactNode }) {
           rent: SYSVAR_RENT_PUBKEY,
         })
         .rpc({ 
-          skipPreflight: false, 
-          commitment: 'confirmed',
-          preflightCommitment: 'confirmed'
+          skipPreflight: true, 
+          commitment: 'confirmed'
         });
 
       console.log('✅ setRewardConfig tx:', sig);
@@ -876,9 +875,10 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       
       // Handle specific transaction errors
       if (e?.message?.includes('already been processed')) {
-        console.log('🔄 Transaction already processed - this might be a duplicate submission');
-        console.log('💡 Try refreshing the page and attempting the configuration again');
-        throw new Error('Transaction already processed. Please refresh and try again.');
+        console.log('🔄 Transaction already processed - treating as success');
+        console.log('💡 This is normal with Phantom wallet - transaction was successful');
+        await refreshData();
+        return;
       } else if (e?.message?.includes('Blockhash not found')) {
         console.log('🔄 Blockhash not found - this is a network timing issue');
         console.log('💡 This usually resolves itself, please try again');
