@@ -9,7 +9,9 @@ import {
 import { loadProgram } from "./idl-loader";
 import { pk, poolPda, signerPda } from "./pda";
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";
+import { ENV } from "../config/env";
+
+const RPC_URL = ENV.SOLANA_RPC_URL;
 
 /**
  * Initialize only.

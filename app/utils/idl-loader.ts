@@ -1,6 +1,7 @@
 // IDL loader that prefers on-chain IDL and falls back to local
 import { AnchorProvider, Program, Idl } from '@coral-xyz/anchor';
 import { Connection, PublicKey } from '@solana/web3.js';
+import { ENV } from '../config/env';
 import idlData from '../idl/simple_staking.json';
 
 // Extended IDL interface that includes address
@@ -8,9 +9,9 @@ interface IdlWithAddress extends Idl {
   address?: string;
 }
 
-// Provide these from env/config
-export const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com";
-export const PROGRAM_ID = new PublicKey("CiDK1DgGmfdWLHsVxgJuzGmqfFvge1cZFvV5CEGizGWU");
+// Use environment configuration
+export const RPC_URL = ENV.SOLANA_RPC_URL;
+export const PROGRAM_ID = new PublicKey(ENV.PROGRAM_ID);
 
 // 1) Try to fetch IDL from chain. 2) else require local file.
 export async function loadProgram(provider: AnchorProvider): Promise<Program> {
