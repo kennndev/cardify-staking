@@ -1470,6 +1470,12 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       return 0;
     }
     
+    // Check if reward vault is configured (not the default empty value)
+    if (poolData.rewardVault === '11111111111111111111111111111111') {
+      console.log('Reward vault not configured yet');
+      return 0;
+    }
+    
     try {
       // Use the actual rewardVault address from poolData (not derived ATA)
       const rewardVaultPk = pk(poolData.rewardVault);
