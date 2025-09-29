@@ -246,6 +246,13 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         const userInfo = await connection.getAccountInfo(userPDA);
         if (userInfo) {
           const user = await (program.account as any).user.fetch(userPDA);
+          console.log('🔍 User account data:', {
+            owner: user.owner?.toBase58(),
+            staked: user.staked?.toNumber(),
+            debt: user.debt?.toString(),
+            unpaidRewards: user.unpaidRewards?.toString(),
+            bump: user.bump
+          });
           setUserData({
             owner: user.owner?.toBase58() ?? 'Unknown',
             staked: user.staked?.toNumber?.() ?? 0,
@@ -253,6 +260,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
             unpaidRewards: user.unpaidRewards?.toString?.() ?? '0',
           });
         } else {
+          console.log('❌ User account not found - user needs to initialize');
           setUserData(null);
         }
       } else {
