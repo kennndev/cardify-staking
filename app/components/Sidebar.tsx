@@ -90,7 +90,6 @@ export default function Sidebar({ activeSection, setActiveSection, isMobileOpen 
                     <span className="text-lg">{item.icon}</span>
                     <span className="text-sm font-medium">{item.label}</span>
                   </div>
-                  <span className="text-xs">▼</span>
                 </button>
               </div>
             );
@@ -138,7 +137,6 @@ export default function Sidebar({ activeSection, setActiveSection, isMobileOpen 
                       <span className="text-xl">{item.icon}</span>
                       <span className="text-base font-medium">{item.label}</span>
                     </div>
-                    <span className="text-sm">▼</span>
                   </button>
                 </div>
               );
