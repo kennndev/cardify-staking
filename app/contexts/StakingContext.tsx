@@ -710,18 +710,87 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       console.log(`🔄 ${paused ? 'Pausing' : 'Unpausing'} pool...`);
       console.log('Pool PDA:', poolPDA.toBase58());
 
-      const sig = await program.methods
-        .setPaused(paused)
-        .accounts({
-          pool: poolPDA,
-          admin: pk(walletAddress),
-        })
-        .rpc({ 
-          commitment: 'confirmed',
-          skipPreflight: true
-        });
+      // Add a small delay to prevent rapid-fire transactions
+      console.log('⏳ Waiting 1 second before submitting transaction...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get fresh blockhash to prevent "Blockhash not found" errors
+      console.log('🔄 Getting fresh blockhash...');
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      console.log('✅ Fresh blockhash obtained:', blockhash);
 
-      console.log(`✅ Pool ${paused ? 'paused' : 'unpaused'} successfully:`, sig);
+      // Build transaction manually to avoid Anchor's blockhash cache
+      try {
+        console.log('🔄 Building setPaused instruction manually...');
+        
+        // Get the setPaused instruction (not the full transaction)
+        const setPausedIx = await program.methods
+          .setPaused(paused)
+          .accounts({
+            pool: poolPDA,
+            admin: pk(walletAddress),
+          })
+          .instruction(); // Get instruction instead of .rpc()
+        
+        // Add unique memo to guarantee unique signature using crypto.randomUUID()
+        const uniqueId = crypto.randomUUID();
+        const memoIx = new TransactionInstruction({
+          programId: MEMO_PROGRAM_ID,
+          keys: [],
+          data: Buffer.from(`setPaused:${uniqueId}`, 'utf8')
+        });
+        
+        console.log('🔄 Using unique memo:', uniqueId);
+        
+        // Build transaction manually
+        const tx = new Transaction().add(memoIx, setPausedIx);
+        
+        // Fetch blockhash ONCE after building the transaction
+        const { blockhash: freshBlockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
+        tx.recentBlockhash = freshBlockhash;
+        tx.lastValidBlockHeight = lastValidBlockHeight;
+        tx.feePayer = pk(walletAddress);
+        
+        console.log('🔄 Using fresh blockhash:', freshBlockhash);
+        
+        // Sign and send manually
+        const signed = await wallet.signTransaction(tx);
+        const sig = await connection.sendRawTransaction(
+          signed.serialize(),
+          { skipPreflight: false }
+        );
+        
+        // Confirm transaction
+        await connection.confirmTransaction(
+          { signature: sig, blockhash: freshBlockhash, lastValidBlockHeight },
+          'confirmed'
+        );
+        
+        console.log(`✅ Pool ${paused ? 'paused' : 'unpaused'} successfully:`, sig);
+      } catch (txError: any) {
+        console.error('❌ Transaction failed:', txError);
+        
+        // Handle specific transaction errors
+        if (txError.message?.includes('already been processed')) {
+          console.log('🔄 Transaction already processed - treating as success...');
+          
+          // Treat "already processed" as success - the transaction went through
+          console.log(`✅ Pool ${paused ? 'paused' : 'unpaused'} successfully (transaction was already processed)`);
+          await refreshData();
+          return; // Exit successfully
+        } else if (txError.message?.includes('Blockhash not found')) {
+          console.log('🔄 Blockhash not found - this is a network timing issue');
+          console.log('💡 This usually resolves itself, please try again');
+          throw new Error('Network timing issue. Please try again in a moment.');
+        } else if (txError.message?.includes('simulation failed')) {
+          console.log('🔄 Transaction simulation failed - checking for specific issues');
+          console.log('💡 This might be due to insufficient permissions or account issues');
+          throw new Error('Transaction simulation failed. Please check your admin permissions and try again.');
+        } else {
+          throw txError;
+        }
+      }
+      
       await new Promise(r => setTimeout(r, 1200));
       await refreshData();
     } catch (e: any) {
@@ -733,6 +802,14 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         console.log(`✅ Pool ${paused ? 'paused' : 'unpaused'} successfully (transaction was already processed)`);
         await refreshData();
         return;
+      } else if (e?.message?.includes('Blockhash not found')) {
+        console.log('🔄 Blockhash not found - this is a network timing issue');
+        console.log('💡 This usually resolves itself, please try again');
+        throw new Error('Network timing issue. Please try again in a moment.');
+      } else if (e?.message?.includes('simulation failed')) {
+        console.log('🔄 Transaction simulation failed - checking for specific issues');
+        console.log('💡 This might be due to insufficient permissions or account issues');
+        throw new Error('Transaction simulation failed. Please check your admin permissions and try again.');
       } else {
         setError(e?.message ?? `Failed to ${paused ? 'pause' : 'unpause'} pool`);
         throw e;
