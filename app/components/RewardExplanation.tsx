@@ -35,7 +35,7 @@ export default function RewardExplanation() {
           <strong>⚠️ Important:</strong> This is the TOTAL amount the pool generates for ALL stakers combined, not just for you!
         </div>
         <div className="text-green-300">
-          <strong>✅ Your Share:</strong> Depends on how much you've staked vs the total pool size
+          <strong>✅ Your Share:</strong> Depends on how much you&apos;ve staked vs the total pool size
         </div>
       </div>
     </div>
