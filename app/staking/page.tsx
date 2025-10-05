@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useStaking } from '../contexts/StakingContext';
+import RewardExplanation from '../components/RewardExplanation';
 
 export default function StakingPage() {
   const { walletAddress, poolData, userData, isLoading, error, stake, unstake, claim, refreshData, stakingDecimals, rewardDecimals } = useStaking();
@@ -125,6 +126,8 @@ export default function StakingPage() {
           <h1 className="text-3xl font-bold text-white mb-2">Staking Dashboard</h1>
           <p className="text-gray-300">Stake your tokens and earn rewards</p>
         </div>
+        
+        <RewardExplanation />
 
         {error && (
           <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-6">
