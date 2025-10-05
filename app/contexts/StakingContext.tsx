@@ -547,6 +547,11 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       // Initialize on-chain (creates Pool PDA + stakingVault ATA)
       const initRes = await initializeOnly(stakingMint, wallet);
 
+      // Check if initialization was successful
+      if (!initRes) {
+        throw new Error('Pool initialization failed - no result returned');
+      }
+
       // Save pool basics in state; reward fields default until setRewardConfig
       setPoolData({
         poolAddress: initRes.pool,
