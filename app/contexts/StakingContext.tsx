@@ -1490,33 +1490,38 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       }
       
       let userRewardAta;
-      try {
-        const userRewardAtaAccount = await getOrCreateAssociatedTokenAccount(
-          connection,
-          wallet as any,          // payer / signer
-          pk(poolData.rewardMint), // mint
-          pk(walletAddress)        // owner
-        );
+      
+      // First, try to derive the ATA address
+      const derivedAta = await getAssociatedTokenAddress(
+        pk(poolData.rewardMint),
+        pk(walletAddress)
+      );
+      
+      console.log('🔍 Derived ATA address:', derivedAta.toBase58());
+      
+      // Check if the ATA already exists
+      const ataInfo = await connection.getAccountInfo(derivedAta);
+      if (ataInfo) {
+        console.log('✅ ATA already exists:', derivedAta.toBase58());
+        userRewardAta = derivedAta;
+      } else {
+        console.log('🔄 ATA does not exist, creating it...');
         
-        userRewardAta = userRewardAtaAccount.address;
-        console.log('✅ User reward ATA ready:', userRewardAta.toBase58());
-      } catch (ataError: any) {
-        console.error('❌ Failed to create/get user reward ATA:', ataError);
-        
-        // If ATA creation fails, try to derive it manually and check if it exists
-        const derivedAta = await getAssociatedTokenAddress(
-          pk(poolData.rewardMint),
-          pk(walletAddress)
-        );
-        
-        console.log('🔍 Derived ATA address:', derivedAta.toBase58());
-        
-        // Check if the ATA exists
-        const ataInfo = await connection.getAccountInfo(derivedAta);
-        if (!ataInfo) {
-          console.log('🔄 ATA does not exist, attempting manual creation...');
+        // Try automatic creation first
+        try {
+          const userRewardAtaAccount = await getOrCreateAssociatedTokenAccount(
+            connection,
+            wallet as any,          // payer / signer
+            pk(poolData.rewardMint), // mint
+            pk(walletAddress)        // owner
+          );
           
-          // Try to create the ATA manually
+          userRewardAta = userRewardAtaAccount.address;
+          console.log('✅ ATA created automatically:', userRewardAta.toBase58());
+        } catch (autoError: any) {
+          console.log('⚠️ Automatic creation failed, trying manual creation:', autoError.message);
+          
+          // Manual creation as fallback
           try {
             const { createAssociatedTokenAccountInstruction } = await import('@solana/spl-token');
             const { Transaction } = await import('@solana/web3.js');
@@ -1546,9 +1551,6 @@ export function StakingProvider({ children }: { children: ReactNode }) {
           } catch (manualError: any) {
             throw new Error(`Failed to create user reward token account. Please ensure you have enough SOL (at least 0.002 SOL) for the account creation fee. Error: ${manualError.message}`);
           }
-        } else {
-          userRewardAta = derivedAta;
-          console.log('✅ Using existing ATA:', userRewardAta.toBase58());
         }
       }
       
