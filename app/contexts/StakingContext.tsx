@@ -458,6 +458,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         accScaled: pool.accScaled?.toString?.() ?? '0',
         lastUpdateTs: pool.lastUpdateTs?.toNumber?.() ?? 0,
         ratePerSec: pool.rewardRatePerSec?.toNumber?.() ?? 0,
+        paused: pool.paused ?? false,
         bump: pool.bump ?? 0,
         signerBump: pool.signerBump ?? 0,
       });
@@ -558,6 +559,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         accScaled: '0',
         lastUpdateTs: Math.floor(Date.now() / 1000),
         ratePerSec: Number(initRes.ratePerSec),
+        paused: false,
         bump: 0,
         signerBump: 0,
       });
