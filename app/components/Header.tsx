@@ -13,8 +13,9 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
       <div className="flex items-center justify-between">
         {/* Left side - Dashboard title and mobile menu */}
         <div className="flex items-center space-x-4">
+          {/* Mobile hamburger menu - only visible on mobile/tablet */}
           <button 
-            className="lg:hidden text-white p-2 touch-target"
+            className="block xl:hidden text-white p-2 touch-target"
             onClick={onMobileMenuToggle}
             aria-label="Toggle mobile menu"
           >
