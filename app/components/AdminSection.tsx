@@ -436,7 +436,7 @@ export default function AdminSection() {
                       step="0.000001"
                       value={newRewardRate}
                       onChange={(e) => setNewRewardRate(e.target.value)}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-gradient-to-r from-white/5 to-white/10 border-2 border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-white/30 shadow-lg"
                       placeholder="Enter new reward rate per second"
                       required
                     />
@@ -444,9 +444,16 @@ export default function AdminSection() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none disabled:hover:scale-100"
                   >
-                    {isLoading ? 'Updating...' : 'Update Reward Rate'}
+                    {isLoading ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <span>Updating...</span>
+                      </div>
+                    ) : (
+                      'Update Reward Rate'
+                    )}
                   </button>
                 </form>
               </div>
@@ -463,7 +470,7 @@ export default function AdminSection() {
                     step="0.000001"
                     value={rewardAmount}
                     onChange={(e) => setRewardAmount(e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-gradient-to-r from-white/5 to-white/10 border-2 border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 hover:border-white/30 shadow-lg"
                     placeholder="Enter amount of reward tokens to add"
                     required
                   />
@@ -482,9 +489,16 @@ export default function AdminSection() {
                 <button
                   type="submit"
                   disabled={isLoading || !poolData?.rewardMint || poolData.rewardMint === '11111111111111111111111111111111'}
-                  className="w-full bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50"
+                  className="w-full bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none disabled:hover:scale-100"
                 >
-                  {isLoading ? 'Adding...' : 'Add Reward Tokens'}
+                  {isLoading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Adding...</span>
+                    </div>
+                  ) : (
+                    'Add Reward Tokens'
+                  )}
                 </button>
                 {(!poolData?.rewardMint || poolData.rewardMint === '11111111111111111111111111111111') && (
                   <p className="text-red-400 text-sm mt-2">
