@@ -62,13 +62,13 @@ export default function Sidebar({ activeSection, setActiveSection, isMobileOpen 
       {/* Mobile Overlay */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 xl:hidden"
           onClick={onMobileClose}
         />
       )}
       
       {/* Desktop Sidebar */}
-      <div className="w-64 sidebar-gradient min-h-screen p-4 hidden lg:block">
+      <div className="w-64 sidebar-gradient min-h-screen p-4 hidden xl:block">
         <div className="space-y-2">
           {menuItems.map((item, index) => {
             // Hide admin menu if user is not admin
@@ -99,7 +99,7 @@ export default function Sidebar({ activeSection, setActiveSection, isMobileOpen 
       </div>
 
       {/* Mobile Sidebar */}
-      <div className={`fixed top-0 left-0 bottom-0 w-80 sidebar-gradient z-50 lg:hidden transform transition-transform duration-300 ease-in-out ${
+      <div className={`fixed top-0 left-0 bottom-0 w-80 sidebar-gradient z-50 xl:hidden transform transition-transform duration-300 ease-in-out ${
         isMobileOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="p-4 h-full overflow-y-auto">
