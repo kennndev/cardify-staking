@@ -253,54 +253,56 @@ export default function AdminSection() {
         <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-white mb-4">Pool Status</h2>
           {poolData ? (
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-300">Total Staked:</span>
-                <span className="text-white font-medium">{formatTokenAmount(poolData.totalStaked).toLocaleString()}</span>
+            <>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Total Staked:</span>
+                  <span className="text-white font-medium">{formatTokenAmount(poolData.totalStaked).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Reward Rate:</span>
+                  <span className="text-white font-medium">{poolData.ratePerSec}/sec</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Reward Mint:</span>
+                  <span className="text-white font-medium">
+                    {poolData.rewardMint === '11111111111111111111111111111111' ? 'Not Set' : poolData.rewardMint.slice(0, 8) + '...'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Last Update:</span>
+                  <span className="text-white font-medium">
+                    {new Date(poolData.lastUpdateTs * 1000).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Status:</span>
+                  <span className={`font-medium ${poolData.paused ? 'text-yellow-400' : 'text-green-400'}`}>
+                    {poolData.paused ? '⏸️ Paused' : '▶️ Active'}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-300">Reward Rate:</span>
-                <span className="text-white font-medium">{poolData.ratePerSec}/sec</span>
+              
+              {/* Pause/Unpause Controls */}
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <button
+                  onClick={handlePauseToggle}
+                  disabled={isLoading}
+                  className={`w-full font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 ${
+                    poolData.paused 
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                      : 'bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white'
+                  }`}
+                >
+                  {isLoading ? 'Processing...' : poolData.paused ? '▶️ Unpause Pool' : '⏸️ Pause Pool'}
+                </button>
+                {poolData.paused && (
+                  <p className="text-yellow-300 text-xs mt-2 text-center">
+                    Pool is paused - new stakes blocked, claims & unstakes allowed
+                  </p>
+                )}
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-300">Reward Mint:</span>
-                <span className="text-white font-medium">
-                  {poolData.rewardMint === '11111111111111111111111111111111' ? 'Not Set' : poolData.rewardMint.slice(0, 8) + '...'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-300">Last Update:</span>
-                <span className="text-white font-medium">
-                  {new Date(poolData.lastUpdateTs * 1000).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-300">Status:</span>
-                <span className={`font-medium ${poolData.paused ? 'text-yellow-400' : 'text-green-400'}`}>
-                  {poolData.paused ? '⏸️ Paused' : '▶️ Active'}
-                </span>
-              </div>
-            </div>
-            
-            {/* Pause/Unpause Controls */}
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <button
-                onClick={handlePauseToggle}
-                disabled={isLoading}
-                className={`w-full font-medium py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 ${
-                  poolData.paused 
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-                    : 'bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white'
-                }`}
-              >
-                {isLoading ? 'Processing...' : poolData.paused ? '▶️ Unpause Pool' : '⏸️ Pause Pool'}
-              </button>
-              {poolData.paused && (
-                <p className="text-yellow-300 text-xs mt-2 text-center">
-                  Pool is paused - new stakes blocked, claims & unstakes allowed
-                </p>
-              )}
-            </div>
+            </>
           ) : (
             <p className="text-gray-400">Pool not initialized</p>
           )}
