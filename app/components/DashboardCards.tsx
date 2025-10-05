@@ -32,11 +32,38 @@ export default function DashboardCards() {
     });
   }
 
+  // Calculate human-readable reward rate
+  const getRewardRateDisplay = () => {
+    if (!poolData || !poolData.ratePerSec) return { value: '0/sec', subtitle: 'NO REWARDS SET' };
+    
+    const baseUnitsPerSec = poolData.ratePerSec;
+    const tokensPerSec = baseUnitsPerSec / Math.pow(10, rewardDecimals);
+    
+    if (tokensPerSec >= 1) {
+      return {
+        value: `${tokensPerSec.toFixed(2)}/sec`,
+        subtitle: `POOL GENERATES ${tokensPerSec.toFixed(2)} TOKENS/SEC FOR ALL STAKERS`
+      };
+    } else if (tokensPerSec >= 0.001) {
+      return {
+        value: `${tokensPerSec.toFixed(6)}/sec`,
+        subtitle: `POOL GENERATES ${tokensPerSec.toFixed(6)} TOKENS/SEC FOR ALL STAKERS`
+      };
+    } else {
+      return {
+        value: `${baseUnitsPerSec} base/sec`,
+        subtitle: `POOL GENERATES ${baseUnitsPerSec} BASE UNITS/SEC (${tokensPerSec.toFixed(8)} tokens/sec)`
+      };
+    }
+  };
+
+  const rewardRateDisplay = getRewardRateDisplay();
+
   const cards = [
     {
       title: 'APY RATE',
       value: liveRewards ? `${liveRewards.apy.toFixed(2)}%` : '0%',
-      subtitle: poolData ? `Rate: ${poolData.ratePerSec || 0}/sec` : 'ANNUAL PERCENTAGE YIELD',
+      subtitle: poolData ? `Rate: ${rewardRateDisplay.value}` : 'ANNUAL PERCENTAGE YIELD',
       icon: '📈',
       color: 'from-yellow-400 to-orange-500',
       bgColor: 'bg-gradient-to-r from-yellow-400/20 to-orange-500/20'
@@ -59,8 +86,8 @@ export default function DashboardCards() {
     },
     {
       title: 'REWARD RATE',
-      value: poolData ? `${poolData.ratePerSec || 0}/sec` : '0/sec',
-      subtitle: 'REWARDS PER SECOND',
+      value: rewardRateDisplay.value,
+      subtitle: rewardRateDisplay.subtitle,
       icon: '💎',
       color: 'from-pink-400 to-red-500',
       bgColor: 'bg-gradient-to-r from-pink-400/20 to-red-500/20'
