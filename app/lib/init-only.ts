@@ -8,132 +8,114 @@ import {
 } from "@solana/spl-token";
 import { loadProgram } from "./idl-loader";
 import { pk, poolPda, signerPda } from "./pda";
-
 import { ENV } from "../config/env";
 
 const RPC_URL = ENV.SOLANA_RPC_URL;
 
+/** Prevent double-submits across re-renders/clicks */
+let initInFlight = false;
+
 /**
- * Initialize only.
- * @param stakingMintStr base58 staking mint address (string)
- * @param wallet object with publicKey, signTransaction, signAllTransactions
+ * Initialize the staking pool once (idempotent).
+ * - Derives PDAs
+ * - Lets the program create the staking vault ATA
+ * - Confirms the tx and treats "already processed" as success after verifying state
  */
 export async function initializeOnly(stakingMintStr: string, wallet: any) {
-  console.log("initializeOnly called with:", {
-    stakingMintStr,
-    walletPk: wallet?.publicKey?.toString?.(),
-  });
-
-  // Build provider with guaranteed PublicKey
-  const connection = new Connection(RPC_URL, "confirmed");
-  const anchorWallet = {
-    publicKey: pk(wallet.publicKey),
-    signTransaction: wallet.signTransaction,
-    signAllTransactions: wallet.signAllTransactions,
-  } as any;
-  const provider = new AnchorProvider(connection, anchorWallet, { commitment: "confirmed" });
-
-  console.log("Loading program...");
-  const program = await loadProgram(provider);
-  console.log("✅ Program loaded successfully");
-
-  // Coerce inputs to PublicKey
-  const stakingMint = pk(stakingMintStr);
-
-  // Derive PDAs (using PublicKeys, never strings)
-  const pool = poolPda(program.programId, stakingMint);
-  const signer = signerPda(program.programId, pool);
-
-  // ATA owned by the signer PDA (allowOwnerOffCurve = true)
-  const stakingVault = await getAssociatedTokenAddress(stakingMint, signer, true);
-
-  // Sanity guards
-  if (pool.equals(stakingMint)) {
-    throw new Error("Pool PDA equals staking mint. Check PDA seeds.");
-  }
-
-  console.log("Initializing pool with accounts:", {
-    admin: provider.wallet.publicKey.toBase58(),
-    stakingMint: stakingMint.toBase58(),
-    pool: pool.toBase58(),
-    signer: signer.toBase58(),
-    stakingVault: stakingVault.toBase58(),
-  });
-
-  // Debug: Check what 3rZrGaXZ4p3sFsgVkzj4ygk4KVKHppNkqutPuEUo6cad corresponds to
-  console.log("Debugging account addresses:");
-  console.log("Admin:", provider.wallet.publicKey.toBase58());
-  console.log("Pool:", pool.toBase58());
-  console.log("Signer:", signer.toBase58());
-  console.log("StakingVault:", stakingVault.toBase58());
-  console.log("StakingMint:", stakingMint.toBase58());
-
-  // Check if the pool already exists
-  try {
-    const poolInfo = await connection.getAccountInfo(pool);
-    if (poolInfo) {
-      console.log("⚠️ Pool already exists! Cannot initialize again.");
-      throw new Error("Pool already exists. Cannot initialize again.");
-    } else {
-      console.log("✅ Pool doesn't exist yet (good for initialization)");
-    }
-  } catch {
-    console.log("✅ Pool doesn't exist yet (good for initialization)");
-  }
-
-  // Check if the stakingVault already exists
-  try {
-    const vaultInfo = await connection.getAccountInfo(stakingVault);
-    if (vaultInfo) {
-      console.log("⚠️ Staking vault already exists, this might cause issues");
-    } else {
-      console.log("✅ Staking vault doesn't exist yet (good for initialization)");
-    }
-  } catch {
-    console.log("✅ Staking vault doesn't exist yet (good for initialization)");
-  }
+  if (initInFlight) return;
+  initInFlight = true;
 
   try {
-    // Let the program create the ATA itself
-    console.log("Calling initialize (program will create ATA)...");
-    await program.methods
-      .initialize()
-      .accounts({
-        admin: provider.wallet.publicKey,
-        stakingMint,
-        pool,            // PDA (will be created by program)
-        poolSigner: signer,          // PDA (no creation; just used as authority)
-        stakingVault,    // ATA (will be created by program)
-        systemProgram: SystemProgram.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        rent: SYSVAR_RENT_PUBKEY,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      })
-      .rpc();
-  } catch (txError) {
-    console.error("❌ Transaction failed:", txError);
-    console.error("Error message:", txError instanceof Error ? txError.message : String(txError));
-    if (txError && typeof txError === 'object' && 'logs' in txError) {
-      console.error("Transaction logs:", (txError as any).logs);
+    const connection = new Connection(RPC_URL, "confirmed");
+    const anchorWallet = {
+      publicKey: pk(wallet.publicKey),
+      signTransaction: wallet.signTransaction,
+      signAllTransactions: wallet.signAllTransactions,
+    } as any;
+    const provider = new AnchorProvider(connection, anchorWallet, {
+      commitment: "confirmed",
+    });
+
+    const program = await loadProgram(provider);
+
+    const stakingMint = pk(stakingMintStr);
+    const pool = poolPda(program.programId, stakingMint);
+    const signer = signerPda(program.programId, pool);
+    const stakingVault = await getAssociatedTokenAddress(stakingMint, signer, true);
+
+    // If already initialized, bail out gracefully
+    const pre = await connection.getAccountInfo(pool, { commitment: "processed" });
+    if (pre) {
+      console.warn("Pool already exists; skipping initialize.");
+      return {
+        pool: pool.toBase58(),
+        signer: signer.toBase58(),
+        stakingVault: stakingVault.toBase58(),
+      };
     }
-    if (txError && typeof txError === 'object' && 'simulationResponse' in txError) {
-      console.error("Simulation response:", (txError as any).simulationResponse);
+
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash("confirmed");
+
+    let sig: string | undefined;
+    try {
+      sig = await program.methods
+        .initialize()
+        .accounts({
+          admin: provider.wallet.publicKey,
+          stakingMint,
+          pool,
+          poolSigner: signer,
+          stakingVault,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: SYSVAR_RENT_PUBKEY,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        })
+        .rpc({ commitment: "confirmed" });
+
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+
+      // Wallet/RPC sometimes returns this when the exact signature was re-sent
+      if (msg.includes("already been processed")) {
+        if (sig) {
+          await connection.confirmTransaction(
+            { signature: sig, blockhash, lastValidBlockHeight },
+            "confirmed"
+          );
+        }
+        // Poll briefly to ensure the account materialized
+        for (let i = 0; i < 10; i++) {
+          const info = await connection.getAccountInfo(pool, { commitment: "confirmed" });
+          if (info) break;
+          await new Promise((r) => setTimeout(r, 300));
+        }
+        const exists = await connection.getAccountInfo(pool, { commitment: "confirmed" });
+        if (!exists) throw e; // truly failed
+      } else {
+        throw e; // bubble real errors
+      }
     }
-    throw txError;
+
+    // Optional: fetch freshly initialized state (safe if IDL matches)
+    const acc: any = await (program.account as any).pool.fetch(pool);
+    return {
+      pool: pool.toBase58(),
+      signer: signer.toBase58(),
+      stakingVault: stakingVault.toBase58(),
+      admin: acc.admin.toBase58(),
+      stakingMint: acc.stakingMint.toBase64 ? acc.stakingMint.toBase58() : acc.stakingMint.toBase58?.() ?? String(acc.stakingMint),
+      totalStaked:
+        acc.totalStaked?.toString?.() ?? String(acc.totalStaked),
+      ratePerSec:
+        acc.ratePerSec?.toString?.() ?? String(acc.ratePerSec),
+    };
+  } finally {
+    initInFlight = false;
   }
-
-  console.log("✅ Pool initialized");
-
-  const acc: any = await (program.account as any).pool.fetch(pool);
-  const out = {
-    pool: pool.toBase58(),
-    signer: signer.toBase58(),
-    stakingVault: stakingVault.toBase58(),
-    admin: acc.admin.toBase58(),
-    stakingMint: acc.stakingMint.toBase58(),
-    totalStaked: acc.totalStaked.toString?.() ?? String(acc.totalStaked),
-    ratePerSec: acc.ratePerSec.toString?.() ?? String(acc.ratePerSec),
-  };
-  console.log("Initialized Pool state:", out);
-  return out;
 }
