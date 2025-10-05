@@ -1476,15 +1476,81 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       
       // Get or create user's reward ATA (idempotent - never fails if exists)
       console.log('🔄 Ensuring user reward ATA exists...');
-      const userRewardAtaAccount = await getOrCreateAssociatedTokenAccount(
-        connection,
-        wallet as any,          // payer / signer
-        pk(poolData.rewardMint), // mint
-        pk(walletAddress)        // owner
-      );
+      console.log('🔍 Reward mint:', poolData.rewardMint);
+      console.log('🔍 User wallet:', walletAddress);
       
-      const userRewardAta = userRewardAtaAccount.address;
-      console.log('✅ User reward ATA ready:', userRewardAta.toBase58());
+      // Check if user has enough SOL for account creation
+      const userBalance = await connection.getBalance(pk(walletAddress));
+      const minBalance = 0.002 * 1e9; // 0.002 SOL in lamports
+      console.log('🔍 User SOL balance:', userBalance / 1e9, 'SOL');
+      console.log('🔍 Minimum required:', minBalance / 1e9, 'SOL');
+      
+      if (userBalance < minBalance) {
+        throw new Error(`Insufficient SOL balance. You need at least 0.002 SOL to create token accounts. Current balance: ${(userBalance / 1e9).toFixed(6)} SOL`);
+      }
+      
+      let userRewardAta;
+      try {
+        const userRewardAtaAccount = await getOrCreateAssociatedTokenAccount(
+          connection,
+          wallet as any,          // payer / signer
+          pk(poolData.rewardMint), // mint
+          pk(walletAddress)        // owner
+        );
+        
+        userRewardAta = userRewardAtaAccount.address;
+        console.log('✅ User reward ATA ready:', userRewardAta.toBase58());
+      } catch (ataError: any) {
+        console.error('❌ Failed to create/get user reward ATA:', ataError);
+        
+        // If ATA creation fails, try to derive it manually and check if it exists
+        const derivedAta = await getAssociatedTokenAddress(
+          pk(poolData.rewardMint),
+          pk(walletAddress)
+        );
+        
+        console.log('🔍 Derived ATA address:', derivedAta.toBase58());
+        
+        // Check if the ATA exists
+        const ataInfo = await connection.getAccountInfo(derivedAta);
+        if (!ataInfo) {
+          console.log('🔄 ATA does not exist, attempting manual creation...');
+          
+          // Try to create the ATA manually
+          try {
+            const { createAssociatedTokenAccountInstruction } = await import('@solana/spl-token');
+            const { Transaction } = await import('@solana/web3.js');
+            
+            const createAtaTx = new Transaction();
+            createAtaTx.add(
+              createAssociatedTokenAccountInstruction(
+                pk(walletAddress),   // payer
+                derivedAta,          // ata to create
+                pk(walletAddress),   // owner
+                pk(poolData.rewardMint) // mint
+              )
+            );
+            
+            // Get fresh blockhash
+            const { blockhash } = await connection.getLatestBlockhash('confirmed');
+            createAtaTx.recentBlockhash = blockhash;
+            createAtaTx.feePayer = pk(walletAddress);
+            
+            // Sign and send
+            const signed = await wallet.signTransaction(createAtaTx);
+            const sig = await connection.sendRawTransaction(signed.serialize());
+            await connection.confirmTransaction(sig, 'confirmed');
+            
+            console.log('✅ ATA created manually:', sig);
+            userRewardAta = derivedAta;
+          } catch (manualError: any) {
+            throw new Error(`Failed to create user reward token account. Please ensure you have enough SOL (at least 0.002 SOL) for the account creation fee. Error: ${manualError.message}`);
+          }
+        } else {
+          userRewardAta = derivedAta;
+          console.log('✅ Using existing ATA:', userRewardAta.toBase58());
+        }
+      }
       
       console.log('Claim accounts:', {
         owner: walletAddress,
