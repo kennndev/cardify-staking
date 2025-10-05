@@ -397,6 +397,15 @@ export default function AdminSection() {
                     <strong>Current Rate:</strong> {poolData?.ratePerSec || 0} base units/sec = {(poolData?.ratePerSec || 0) / Math.pow(10, 6)} tokens/sec
                   </div>
                   <div className="text-sm text-white">
+                    <strong>Pool Generates:</strong> {(poolData?.ratePerSec || 0) / Math.pow(10, 6)} tokens/sec for ALL stakers (not just you)
+                  </div>
+                  <div className="text-sm text-white">
+                    <strong>Daily Pool Rewards:</strong> {((poolData?.ratePerSec || 0) / Math.pow(10, 6) * 86400).toFixed(6)} tokens/day total
+                  </div>
+                  <div className="text-sm text-white">
+                    <strong>Your Share Depends On:</strong> Your staked amount vs total pool size
+                  </div>
+                  <div className="text-sm text-white">
                     <strong>Current APY:</strong> {poolData?.ratePerSec && poolData.ratePerSec > 0 ? 
                       `${((poolData.ratePerSec * 31536000) / (poolData.totalStaked || 1) * 100).toFixed(6)}%` : 
                       '0% (rate is 0)'
