@@ -15,7 +15,7 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
         <div className="flex items-center space-x-4">
           {/* Mobile hamburger menu - only visible on mobile/tablet */}
           <button 
-            className="block md:hidden text-white p-2 touch-target"
+            className="block sm:hidden text-white p-2 touch-target"
             onClick={onMobileMenuToggle}
             aria-label="Toggle mobile menu"
           >
