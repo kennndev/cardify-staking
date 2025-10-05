@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useStaking } from '../contexts/StakingContext';
 import { CyberDefense } from './cyber-defense';
-import { PuzzleMatch } from './puzzle-match';
 import { PopPop } from './pop-pop';
 
 interface Game {
@@ -20,23 +19,13 @@ interface Game {
 const games: Game[] = [
   {
     id: 'cyber-defense',
-    name: 'Cyber Defense',
+    name: 'Cyber Defence',
     description: 'Defend your base from incoming cyber attacks in this tower defense game',
     icon: '🛡️',
     component: CyberDefense,
     isAvailable: true,
-    stakingRequirement: 5_000_000_000_000, // 5 million tokens (base units for 6-decimal token)
+    stakingRequirement: 10_000_000_000, // 10,000 tokens (base units for 6-decimal token)
     tier: 1,
-  },
-  {
-    id: 'puzzle-match',
-    name: 'Puzzle Match',
-    description: 'Match colorful gems in this addictive puzzle game with strategic gameplay',
-    icon: '💎',
-    component: PuzzleMatch,
-    isAvailable: true,
-    stakingRequirement: 6_000_000_000_000, // 6 million tokens (base units for 6-decimal token)
-    tier: 2,
   },
   {
     id: 'pop-pop',
@@ -45,18 +34,8 @@ const games: Game[] = [
     icon: '🫧',
     component: PopPop,
     isAvailable: true,
-    stakingRequirement: 7_000_000_000_000, // 7 million tokens (base units for 6-decimal token)
-    tier: 3,
-  },
-  {
-    id: 'coming-soon-1',
-    name: 'Crypto Miner',
-    description: 'Mine cryptocurrency in this strategic mining game (Coming Soon)',
-    icon: '⛏️',
-    component: () => <div className="text-center text-gray-400">Coming Soon</div>,
-    isAvailable: false,
-    stakingRequirement: 0,
-    tier: 0,
+    stakingRequirement: 10_000_000_000, // 10,000 tokens (base units for 6-decimal token)
+    tier: 1,
   },
 ];
 
@@ -96,9 +75,7 @@ export default function GamesSection() {
 
   // Helper function to get user's current tier
   const getUserTier = (): number => {
-    if (userStakedAmount >= 7_000_000_000_000) return 3; // All games (7M tokens)
-    if (userStakedAmount >= 6_000_000_000_000) return 2; // Cyber Defense + Puzzle (6M tokens)
-    if (userStakedAmount >= 5_000_000_000_000) return 1; // Cyber Defense only (5M tokens)
+    if (userStakedAmount >= 10_000_000_000) return 1; // All games (10,000 tokens)
     return 0; // No access
   };
 
@@ -195,25 +172,19 @@ export default function GamesSection() {
 
       {/* Staking Tier Info */}
       <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg p-4 mb-6">
-        <h2 className="text-lg font-bold text-white mb-3">🎯 Staking Tiers</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="text-lg font-bold text-white mb-3">🎯 Game Access</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="text-center">
-            <div className="text-2xl mb-2">🥉</div>
-            <h3 className="font-semibold text-white mb-1">Tier 1</h3>
-            <p className="text-sm text-gray-300">5M+ tokens</p>
-            <p className="text-xs text-blue-400">Cyber Defense</p>
+            <div className="text-2xl mb-2">🔒</div>
+            <h3 className="font-semibold text-white mb-1">Locked</h3>
+            <p className="text-sm text-gray-300">Less than 10,000 tokens</p>
+            <p className="text-xs text-red-400">No game access</p>
           </div>
           <div className="text-center">
-            <div className="text-2xl mb-2">🥈</div>
-            <h3 className="font-semibold text-white mb-1">Tier 2</h3>
-            <p className="text-sm text-gray-300">6M+ tokens</p>
-            <p className="text-xs text-blue-400">Cyber Defense + Puzzle</p>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl mb-2">🥇</div>
-            <h3 className="font-semibold text-white mb-1">Tier 3</h3>
-            <p className="text-sm text-gray-300">7M+ tokens</p>
-            <p className="text-xs text-blue-400">All Games</p>
+            <div className="text-2xl mb-2">🎮</div>
+            <h3 className="font-semibold text-white mb-1">Unlocked</h3>
+            <p className="text-sm text-gray-300">10,000+ tokens</p>
+            <p className="text-xs text-green-400">All Games Available</p>
           </div>
         </div>
       </div>
