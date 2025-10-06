@@ -2,17 +2,21 @@
 
 import { useState, useEffect, memo, useCallback } from 'react';
 import { useStaking } from '../contexts/StakingContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { TicketService, Ticket, TicketMessage } from '../lib/supabase';
 import TicketList from './TicketList';
 import WalletAddress from './WalletAddress';
 
 export default function AdminSection() {
-  const { isAdmin, poolData, isLoading, error, stakingMint, stakingDecimals, initializePool, fetchPoolByMint, setStakingMint, setRewardConfig, addRewardTokens, setRewardRate, setPaused } = useStaking();
+  const { isAdmin, poolData, isLoading, error, stakingMint, stakingDecimals, initializePool, fetchPoolByMint, setStakingMint, setRewardConfig, addRewardTokens, setRewardRate, setPaused, withdrawRewards, setAdmin, ensureVaults, closePool } = useStaking();
+  const { showSuccess, showError, showWarning, showInfo } = useNotifications();
   const [stakingMintInput, setStakingMintInput] = useState('');
   const [rewardMint, setRewardMint] = useState('');
   const [ratePerSec, setRatePerSec] = useState('');
   const [rewardAmount, setRewardAmount] = useState('');
   const [newRewardRate, setNewRewardRate] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [newAdminAddress, setNewAdminAddress] = useState('');
   
   // Helper function to format token amounts using dynamic decimals
   const formatTokenAmount = (amount: number, decimals: number = stakingDecimals) => {
@@ -24,9 +28,81 @@ export default function AdminSection() {
     
     try {
       await setPaused(!poolData.paused);
-      alert(`Pool ${poolData.paused ? 'unpaused' : 'paused'} successfully!`);
+      showSuccess(
+        'Pool Status Updated',
+        `Pool has been ${poolData.paused ? 'unpaused' : 'paused'} successfully!`
+      );
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(
+        'Failed to Update Pool Status',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
+    }
+  };
+
+  const handleWithdrawRewards = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!withdrawAmount) {
+      showWarning('Invalid Input', 'Please enter an amount to withdraw');
+      return;
+    }
+    
+    try {
+      await withdrawRewards(parseFloat(withdrawAmount));
+      showSuccess('Rewards Withdrawn', 'Rewards have been withdrawn successfully!');
+      setWithdrawAmount('');
+    } catch (err) {
+      showError(
+        'Withdrawal Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
+    }
+  };
+
+  const handleSetAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminAddress) {
+      showWarning('Invalid Input', 'Please enter a new admin address');
+      return;
+    }
+    
+    try {
+      await setAdmin(newAdminAddress);
+      showSuccess('Admin Updated', 'Admin privileges have been transferred successfully!');
+      setNewAdminAddress('');
+    } catch (err) {
+      showError(
+        'Admin Update Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
+    }
+  };
+
+  const handleEnsureVaults = async () => {
+    try {
+      await ensureVaults();
+      showSuccess('Vaults Ensured', 'All vaults have been created/verified successfully!');
+    } catch (err) {
+      showError(
+        'Vault Operation Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
+    }
+  };
+
+  const handleClosePool = async () => {
+    if (!confirm('Are you sure you want to close the pool? This action cannot be undone!')) {
+      return;
+    }
+    
+    try {
+      await closePool();
+      showSuccess('Pool Closed', 'Pool has been permanently closed successfully!');
+    } catch (err) {
+      showError(
+        'Pool Closure Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     }
   };
   
@@ -506,6 +582,138 @@ export default function AdminSection() {
                   </p>
                 )}
               </form>
+            </div>
+
+            {/* Withdraw Rewards */}
+            <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">Withdraw Rewards</h2>
+              <form onSubmit={handleWithdrawRewards} className="space-y-4">
+                <div>
+                  <label className="block text-gray-300 text-sm mb-2">Amount to Withdraw</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    className="w-full bg-gradient-to-r from-white/5 to-white/10 border-2 border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 hover:border-white/30 shadow-lg"
+                    placeholder="Enter amount of reward tokens to withdraw"
+                    required
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Only works when pool is paused. Withdraws tokens from reward vault to your wallet.
+                  </p>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading || !poolData?.paused}
+                  className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none disabled:hover:scale-100"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Withdrawing...</span>
+                    </div>
+                  ) : (
+                    'Withdraw Rewards'
+                  )}
+                </button>
+                {!poolData?.paused && (
+                  <p className="text-red-400 text-sm mt-2">
+                    Pool must be paused to withdraw rewards
+                  </p>
+                )}
+              </form>
+            </div>
+
+            {/* Set Admin */}
+            <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">Set New Admin</h2>
+              <form onSubmit={handleSetAdmin} className="space-y-4">
+                <div>
+                  <label className="block text-gray-300 text-sm mb-2">New Admin Address</label>
+                  <input
+                    type="text"
+                    value={newAdminAddress}
+                    onChange={(e) => setNewAdminAddress(e.target.value)}
+                    className="w-full bg-gradient-to-r from-white/5 to-white/10 border-2 border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 hover:border-white/30 shadow-lg"
+                    placeholder="Enter new admin wallet address"
+                    required
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    This will transfer admin privileges to the new address
+                  </p>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none disabled:hover:scale-100"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Updating...</span>
+                    </div>
+                  ) : (
+                    'Set New Admin'
+                  )}
+                </button>
+              </form>
+            </div>
+
+            {/* Ensure Vaults */}
+            <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">Ensure Vaults</h2>
+              <div className="space-y-4">
+                <p className="text-gray-300 text-sm">
+                  Recreate any missing Associated Token Accounts (ATAs) for the pool vaults.
+                </p>
+                <button
+                  onClick={handleEnsureVaults}
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none disabled:hover:scale-100"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Ensuring...</span>
+                    </div>
+                  ) : (
+                    'Ensure Vaults'
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Close Pool */}
+            <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">Close Pool</h2>
+              <div className="space-y-4">
+                <div className="bg-red-600/20 border border-red-500/50 rounded-lg p-3">
+                  <div className="text-sm text-red-300">
+                    <strong>⚠️ DANGER:</strong> This will permanently close the pool and close all vaults.
+                    Only use when pool is paused and all stakes are withdrawn.
+                  </div>
+                </div>
+                <button
+                  onClick={handleClosePool}
+                  disabled={isLoading || !poolData?.paused}
+                  className="w-full bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none disabled:hover:scale-100"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Closing...</span>
+                    </div>
+                  ) : (
+                    'Close Pool'
+                  )}
+                </button>
+                {!poolData?.paused && (
+                  <p className="text-red-400 text-sm mt-2">
+                    Pool must be paused to close
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
