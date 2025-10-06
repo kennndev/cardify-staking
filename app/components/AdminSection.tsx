@@ -261,7 +261,7 @@ export default function AdminSection() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Reward Rate:</span>
-                  <span className="text-white font-medium">{poolData.ratePerSec}/sec</span>
+                  <span className="text-white font-medium">{poolData.rewardRatePerSec}/sec</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Reward Mint:</span>
@@ -394,20 +394,20 @@ export default function AdminSection() {
               <div className="space-y-4">
                 <div className="bg-blue-600/20 border border-blue-500/50 rounded-lg p-3">
                   <div className="text-sm text-white">
-                    <strong>Current Rate:</strong> {poolData?.ratePerSec || 0} base units/sec = {(poolData?.ratePerSec || 0) / Math.pow(10, 6)} tokens/sec
+                    <strong>Current Rate:</strong> {poolData?.rewardRatePerSec || 0} base units/sec = {(poolData?.rewardRatePerSec || 0) / Math.pow(10, 6)} tokens/sec
                   </div>
                   <div className="text-sm text-white">
-                    <strong>Pool Generates:</strong> {(poolData?.ratePerSec || 0) / Math.pow(10, 6)} tokens/sec for ALL stakers (not just you)
+                    <strong>Pool Generates:</strong> {(poolData?.rewardRatePerSec || 0) / Math.pow(10, 6)} tokens/sec for ALL stakers (not just you)
                   </div>
                   <div className="text-sm text-white">
-                    <strong>Daily Pool Rewards:</strong> {((poolData?.ratePerSec || 0) / Math.pow(10, 6) * 86400).toFixed(6)} tokens/day total
+                    <strong>Daily Pool Rewards:</strong> {((poolData?.rewardRatePerSec || 0) / Math.pow(10, 6) * 86400).toFixed(6)} tokens/day total
                   </div>
                   <div className="text-sm text-white">
                     <strong>Your Share Depends On:</strong> Your staked amount vs total pool size
                   </div>
                   <div className="text-sm text-white">
-                    <strong>Current APY:</strong> {poolData?.ratePerSec && poolData.ratePerSec > 0 ? 
-                      `${((poolData.ratePerSec * 31536000) / (poolData.totalStaked || 1) * 100).toFixed(6)}%` : 
+                    <strong>Current APY:</strong> {poolData?.rewardRatePerSec && poolData.rewardRatePerSec > 0 ? 
+                      `${((poolData.rewardRatePerSec * 31536000) / (poolData.totalStaked || 1) * 100).toFixed(6)}%` : 
                       '0% (rate is 0)'
                     }
                   </div>
