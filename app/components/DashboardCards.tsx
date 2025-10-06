@@ -16,7 +16,7 @@ export default function DashboardCards() {
 
   // Log APY calculation details
   if (poolData) {
-    const ratePerSec = poolData.ratePerSec || 0;
+    const ratePerSec = poolData.rewardRatePerSec || 0;
     const totalStakedRaw = poolData.totalStaked || 0;
     const totalStakedFormatted = formatTokenAmount(totalStakedRaw);
     const secondsPerYear = 31536000;
@@ -34,9 +34,9 @@ export default function DashboardCards() {
 
   // Calculate human-readable reward rate
   const getRewardRateDisplay = () => {
-    if (!poolData || !poolData.ratePerSec) return { value: '0/sec', subtitle: 'NO REWARDS SET' };
+    if (!poolData || !poolData.rewardRatePerSec) return { value: '0/sec', subtitle: 'NO REWARDS SET' };
     
-    const baseUnitsPerSec = poolData.ratePerSec;
+    const baseUnitsPerSec = poolData.rewardRatePerSec;
     const tokensPerSec = baseUnitsPerSec / Math.pow(10, rewardDecimals);
     
     if (tokensPerSec >= 1) {
