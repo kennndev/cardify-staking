@@ -83,7 +83,7 @@ export default function AdminPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Reward Rate:</span>
-                  <span className="text-white font-medium">{poolData.ratePerSec}/sec</span>
+                  <span className="text-white font-medium">{poolData.rewardRatePerSec}/sec</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Status:</span>
