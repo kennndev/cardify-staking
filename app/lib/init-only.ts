@@ -113,7 +113,7 @@ export async function initializeOnly(stakingMintStr: string, wallet: any) {
       totalStaked:
         acc.totalStaked?.toString?.() ?? String(acc.totalStaked),
       ratePerSec:
-        acc.ratePerSec?.toString?.() ?? String(acc.ratePerSec),
+        acc.rewardRatePerSec?.toString?.() ?? String(acc.rewardRatePerSec),
     };
   } finally {
     initInFlight = false;
