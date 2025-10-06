@@ -25,7 +25,7 @@ export default function Home() {
 
   // Log APY calculation details
   if (poolData) {
-    const ratePerSec = poolData.ratePerSec || 0;
+    const ratePerSec = poolData.rewardRatePerSec || 0;
     const totalStakedRaw = poolData.totalStaked || 0;
     const totalStakedFormatted = formatTokenAmount(totalStakedRaw);
     const secondsPerYear = 31536000;
@@ -82,11 +82,11 @@ export default function Home() {
                   <div className="text-left md:text-right">
                     <div className="text-3xl md:text-4xl font-bold text-yellow-400">
                       {poolData && poolData.totalStaked > 0 ? 
-                        `${((poolData.ratePerSec || 0) * 31536000 / poolData.totalStaked * 100).toFixed(2)}%` : 
+                        `${((poolData.rewardRatePerSec || 0) * 31536000 / poolData.totalStaked * 100).toFixed(2)}%` : 
                         '0%'}
                     </div>
                     <div className="text-sm text-gray-300">
-                      Rate: {poolData ? `${poolData.ratePerSec || 0}/sec` : '0/sec'}
+                      Rate: {poolData ? `${poolData.rewardRatePerSec || 0}/sec` : '0/sec'}
                     </div>
                     <div className="text-xs text-gray-400 mt-1">
                       Total Staked: {poolData ? formatTokenAmount(poolData.totalStaked) : '0'}
@@ -120,9 +120,9 @@ export default function Home() {
                       // Calculate real performance metrics
                       const totalStaked = poolData ? formatTokenAmount(poolData.totalStaked || 0) : '0';
                       const userStaked = userData ? formatTokenAmount(userData.staked || 0) : '0';
-                      const rewardRate = poolData ? poolData.ratePerSec || 0 : 0;
+                      const rewardRate = poolData ? poolData.rewardRatePerSec || 0 : 0;
                       const apy = poolData && poolData.totalStaked > 0 ? 
-                        ((poolData.ratePerSec || 0) * 31536000 / poolData.totalStaked * 100) : 0;
+                        ((poolData.rewardRatePerSec || 0) * 31536000 / poolData.totalStaked * 100) : 0;
                       
                       // Calculate percentages (normalize to 0-100 scale)
                       const totalStakedPercent = Math.min(100, Math.max(0, (parseInt(totalStaked) / 1000) * 10)); // Scale based on 1000 tokens = 100%
@@ -234,7 +234,7 @@ export default function Home() {
                       <span className="text-pink-400">●</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-300">{poolData ? poolData.ratePerSec || 0 : 0}/sec rate</span>
+                      <span className="text-gray-300">{poolData ? poolData.rewardRatePerSec || 0 : 0}/sec rate</span>
                       <span className="text-orange-400">●</span>
                     </div>
                   </div>
@@ -260,7 +260,7 @@ export default function Home() {
                       // Calculate real metrics for bar heights
                       const totalStaked = poolData ? parseInt(formatTokenAmount(poolData.totalStaked || 0)) : 0;
                       const userStaked = userData ? parseInt(formatTokenAmount(userData.staked || 0)) : 0;
-                      const rewardRate = poolData ? poolData.ratePerSec || 0 : 0;
+                      const rewardRate = poolData ? poolData.rewardRatePerSec || 0 : 0;
                       const poolHealth = 95; // Assume healthy pool
                       
                       // Normalize to 0-60 scale for bar heights (reduced from 100)
@@ -323,7 +323,7 @@ export default function Home() {
                     <div className="text-xs text-gray-300">Pool Health</div>
                     <div className="text-xs text-green-400">
                       {poolData && poolData.totalStaked > 0 ? 
-                        `${((poolData.ratePerSec || 0) * 31536000 / poolData.totalStaked * 100).toFixed(2)}%` : 
+                        `${((poolData.rewardRatePerSec || 0) * 31536000 / poolData.totalStaked * 100).toFixed(2)}%` : 
                         '0.00%'
                       }
                     </div>
@@ -367,7 +367,7 @@ export default function Home() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-300">Rate:</span>
-                        <span className="text-white">{poolData ? poolData.ratePerSec || 0 : 0}/sec</span>
+                        <span className="text-white">{poolData ? poolData.rewardRatePerSec || 0 : 0}/sec</span>
                       </div>
                     </div>
                   </div>
