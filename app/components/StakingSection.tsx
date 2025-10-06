@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useStaking } from '../contexts/StakingContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { usePendingRewards } from '../hooks/usePendingRewards';
 import PoolSelector from './PoolSelector';
 import { formatToken } from '../utils/format';
 
 export default function StakingSection() {
-  const { walletAddress, poolData, userData, isLoading, error, stake, unstake, claim, refreshData, stakingDecimals, rewardDecimals, connection } = useStaking();
+  const { walletAddress, poolData, userData, isLoading, error, stake, unstake, claim, refreshData, stakingDecimals, rewardDecimals, connection, emergencyUnstake, closeUser } = useStaking();
+  const { showSuccess, showError, showWarning, showInfo } = useNotifications();
   
   // Calculate live pending rewards
   const liveRewards = usePendingRewards(poolData, userData);
@@ -18,6 +20,7 @@ export default function StakingSection() {
   };
   const [stakeAmount, setStakeAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
+  const [emergencyUnstakeAmount, setEmergencyUnstakeAmount] = useState('');
   const [currentTime, setCurrentTime] = useState(Math.floor(Date.now() / 1000));
 
   // Update time every second for real-time pending rewards
@@ -33,12 +36,12 @@ export default function StakingSection() {
   const handleStake = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!walletAddress) {
-      alert('Please connect your wallet first');
+      showWarning('Wallet Required', 'Please connect your wallet first');
       return;
     }
     
     if (poolData?.paused) {
-      alert('Pool is paused - staking is temporarily disabled');
+      showWarning('Pool Paused', 'Pool is paused - staking is temporarily disabled');
       return;
     }
     
@@ -49,17 +52,20 @@ export default function StakingSection() {
     
     try {
       await stake(parseFloat(stakeAmount));
-      alert('Staked successfully!');
+      showSuccess('Staking Successful', 'Your tokens have been staked successfully!');
       setStakeAmount('');
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(
+        'Staking Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     }
   };
 
   const handleUnstake = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!walletAddress) {
-      alert('Please connect your wallet first');
+      showWarning('Wallet Required', 'Please connect your wallet first');
       return;
     }
     
@@ -83,16 +89,19 @@ export default function StakingSection() {
     
     try {
       await unstake(parseFloat(unstakeAmount));
-      alert('Unstaked successfully! Your rewards were automatically claimed.');
+      showSuccess('Unstaking Successful', 'Your tokens have been unstaked and rewards claimed!');
       setUnstakeAmount('');
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(
+        'Operation Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     }
   };
 
   const handleClaim = async () => {
     if (!walletAddress) {
-      alert('Please connect your wallet first');
+      showWarning('Wallet Required', 'Please connect your wallet first');
       return;
     }
     
@@ -103,15 +112,76 @@ export default function StakingSection() {
     
     try {
       await claim();
-      alert('Rewards claimed successfully!');
+      showSuccess('Rewards Claimed', 'Your rewards have been claimed successfully!');
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(
+        'Operation Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
+    }
+  };
+
+  const handleEmergencyUnstake = async () => {
+    if (!walletAddress) {
+      showWarning('Wallet Required', 'Please connect your wallet first');
+      return;
+    }
+    
+    if (!emergencyUnstakeAmount) {
+      showWarning('Invalid Input', 'Please enter an amount to emergency unstake');
+      return;
+    }
+    
+    if (isLoading) {
+      console.log('⚠️ Transaction already in progress, ignoring click');
+      return;
+    }
+    
+    if (!confirm('⚠️ Emergency unstake will withdraw your principal but forfeit all pending rewards. Continue?')) {
+      return;
+    }
+    
+    try {
+      await emergencyUnstake(parseFloat(emergencyUnstakeAmount));
+      showSuccess('Emergency Unstake Successful', 'Your tokens have been unstaked. Note: Pending rewards were forfeited.');
+      setEmergencyUnstakeAmount('');
+    } catch (err) {
+      showError(
+        'Operation Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
+    }
+  };
+
+  const handleCloseUser = async () => {
+    if (!walletAddress) {
+      showWarning('Wallet Required', 'Please connect your wallet first');
+      return;
+    }
+    
+    if (isLoading) {
+      console.log('⚠️ Transaction already in progress, ignoring click');
+      return;
+    }
+    
+    if (!confirm('Are you sure you want to close your user account? This can only be done when you have no stake and no pending rewards.')) {
+      return;
+    }
+    
+    try {
+      await closeUser();
+      showSuccess('Account Closed', 'Your user account has been closed successfully!');
+    } catch (err) {
+      showError(
+        'Operation Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     }
   };
 
   const handleRefreshData = async () => {
     if (!walletAddress) {
-      alert('Please connect your wallet first');
+      showWarning('Wallet Required', 'Please connect your wallet first');
       return;
     }
     
@@ -121,7 +191,10 @@ export default function StakingSection() {
       console.log('✅ Data refreshed');
     } catch (err) {
       console.error('❌ Failed to refresh data:', err);
-      alert(`Error refreshing data: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(
+        'Data Refresh Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     }
   };
 
@@ -384,6 +457,60 @@ export default function StakingSection() {
               💡 Unstaking will automatically claim your pending rewards first
             </p>
           </form>
+        </div>
+
+        {/* Emergency Unstake */}
+        <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-4 md:p-6 mobile-card">
+          <h2 className="text-lg md:text-xl font-semibold text-white mb-3 md:mb-4">Emergency Unstake</h2>
+          <form onSubmit={(e) => { e.preventDefault(); handleEmergencyUnstake(); }} className="space-y-4">
+            <div>
+              <label className="block text-gray-300 text-sm mb-2">Amount to Emergency Unstake</label>
+              <input
+                type="number"
+                value={emergencyUnstakeAmount}
+                onChange={(e) => setEmergencyUnstakeAmount(e.target.value)}
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 touch-target"
+                placeholder="Enter amount to emergency unstake"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isLoading || !poolData || !userData || userData.staked === 0}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 touch-target"
+            >
+              {isLoading ? 'Emergency Unstaking...' : 'Emergency Unstake'}
+            </button>
+            <div className="bg-red-600/20 border border-red-500/50 rounded-lg p-3">
+              <div className="text-sm text-red-300">
+                <strong>⚠️ WARNING:</strong> Emergency unstake will forfeit all pending rewards. Only use in emergencies.
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* Close User Account */}
+        <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-4 md:p-6 mobile-card">
+          <h2 className="text-lg md:text-xl font-semibold text-white mb-3 md:mb-4">Close User Account</h2>
+          <div className="space-y-4">
+            <div className="bg-yellow-600/20 border border-yellow-500/50 rounded-lg p-3">
+              <div className="text-sm text-yellow-300">
+                <strong>ℹ️ INFO:</strong> This will close your user account. Only available when you have no stake and no pending rewards.
+              </div>
+            </div>
+            <button
+              onClick={handleCloseUser}
+              disabled={isLoading || !userData || (userData.staked ?? 0) > 0 || calculatePendingRewards() > 0}
+              className="w-full bg-gradient-to-r from-gray-500 to-gray-700 hover:from-gray-600 hover:to-gray-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 touch-target"
+            >
+              {isLoading ? 'Closing...' : 'Close User Account'}
+            </button>
+            {((userData?.staked ?? 0) > 0 || calculatePendingRewards() > 0) && (
+              <p className="text-red-400 text-sm mt-2">
+                Cannot close account: You have stake or pending rewards
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
