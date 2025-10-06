@@ -35,6 +35,7 @@ export class OpenAIService {
 PLATFORM INFORMATION:
 - Name: NickPlaysCrypto (NPC)
 - Token: NPC on Solana blockchain
+- Staking App: https://npc-staking.vercel.app/
 - Website: https://www.nickplayscrypto.com/
 - Twitter: https://x.com/NickPlaysCrypto
 - DexScreener: https://dexscreener.com/solana/6mpafrxmywfyojaunxdqgw9sq2mhpuh3d6daw3xipump
@@ -53,11 +54,15 @@ PLATFORM FEATURES:
 6. Professional dashboard with staking metrics
 
 STAKING DETAILS:
-- Users can stake NPC tokens to earn rewards
-- APY rates are calculated in real-time
-- Rewards are distributed automatically
-- Users can view their staking performance on the dashboard
-- Unstaking is available (subject to any lock periods)
+- Users can stake NPC tokens directly on the staking app at https://npc-staking.vercel.app/
+- Connect your Solana wallet to the staking platform
+- Choose the amount of NPC tokens you want to stake
+- APY rates are calculated in real-time and displayed on the dashboard
+- Rewards are distributed automatically based on your staked amount
+- Users can view their staking performance, pending rewards, and APY on the dashboard
+- Unstaking is available with automatic reward claiming
+- Emergency unstake option available (forfeits pending rewards)
+- Real-time updates on pool health and total staked amounts
 
 GAMING INTEGRATION:
 - Games are integrated into the platform
@@ -110,6 +115,18 @@ TECHNICAL DETAILS:
 - Real-time data updates
 - Professional UI/UX design
 - Mobile-responsive interface
+
+STAKING INSTRUCTIONS:
+To stake NPC tokens on the NickPlaysCrypto platform, follow these steps:
+
+1. Visit the staking app at https://npc-staking.vercel.app/
+2. Connect your Solana wallet to the platform
+3. Navigate to the staking section on the platform
+4. Choose the amount of NPC tokens you want to stake
+5. Follow the on-screen instructions to complete the staking process
+6. Once you have successfully staked your tokens, you will start earning rewards based on the current APY rates
+
+Staking your NPC tokens allows you to earn rewards while supporting the platform. The staking app provides real-time updates on your rewards, APY, and pool health.
 
 When users ask questions, provide detailed, helpful responses about:
 - How to use the platform
@@ -206,6 +223,7 @@ NickPlaysCrypto is a revolutionary Solana-based staking platform that combines D
 • Regular updates and improvements
 
 🔗 **Important Links:**
+• Staking App: https://npc-staking.vercel.app/
 • Website: https://www.nickplayscrypto.com/
 • Twitter: https://x.com/NickPlaysCrypto
 • DexScreener: https://dexscreener.com/solana/6mpafrxmywfyojaunxdqgw9sq2mhpuh3d6daw3xipump
@@ -423,6 +441,7 @@ NickPlaysCrypto is a comprehensive Solana staking platform that combines DeFi wi
 • Community integration and social features
 
 🔗 **Important Links:**
+• Staking App: https://npc-staking.vercel.app/
 • Website: https://www.nickplayscrypto.com/
 • Twitter: https://x.com/NickPlaysCrypto
 • DexScreener: https://dexscreener.com/solana/6mpafrxmywfyojaunxdqgw9sq2mhpuh3d6daw3xipump
