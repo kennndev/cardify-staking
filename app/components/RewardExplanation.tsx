@@ -5,11 +5,11 @@ import { useStaking } from '../contexts/StakingContext';
 export default function RewardExplanation() {
   const { poolData, rewardDecimals } = useStaking();
 
-  if (!poolData || !poolData.ratePerSec) {
+  if (!poolData || !poolData.rewardRatePerSec) {
     return null;
   }
 
-  const baseUnitsPerSec = poolData.ratePerSec;
+  const baseUnitsPerSec = poolData.rewardRatePerSec;
   const tokensPerSec = baseUnitsPerSec / Math.pow(10, rewardDecimals);
   const tokensPerDay = tokensPerSec * 86400;
   const tokensPerYear = tokensPerSec * 31536000;
