@@ -143,7 +143,7 @@ export default function StakingSection() {
     user,
     nowSecs
   }: {
-    pool: { accScaled: string; lastUpdateTs: number; ratePerSec: number; totalStaked: number };
+    pool: { accScaled: string; lastUpdateTs: number; rewardRatePerSec: number; totalStaked: number };
     user: { staked: number; debt: string; unpaidRewards: string };
     nowSecs: number;
   }) => {
@@ -155,7 +155,7 @@ export default function StakingSection() {
     const staked = BigInt(user.staked ?? 0);
 
     const dt = BigInt(Math.max(0, nowSecs - (pool.lastUpdateTs ?? nowSecs)));
-    const rate = BigInt(pool.ratePerSec ?? 0);
+    const rate = BigInt(pool.rewardRatePerSec ?? 0);
     const totalStaked = BigInt(pool.totalStaked ?? 0);
 
 
@@ -184,7 +184,7 @@ export default function StakingSection() {
       pool: {
         accScaled: poolData.accScaled,
         lastUpdateTs: poolData.lastUpdateTs,
-        ratePerSec: poolData.ratePerSec,
+        rewardRatePerSec: poolData.rewardRatePerSec,
         totalStaked: poolData.totalStaked,
       },
       user: {
@@ -254,7 +254,7 @@ export default function StakingSection() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Reward Rate:</span>
-                <span className="text-white font-medium">{poolData.ratePerSec}/sec</span>
+                <span className="text-white font-medium">{poolData.rewardRatePerSec}/sec</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Reward Mint:</span>
