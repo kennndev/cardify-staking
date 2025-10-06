@@ -238,6 +238,18 @@ I'm here to help with any questions about NickPlaysCrypto!`;
 
         {/* Additional Resources */}
         <div className="mt-6 sm:mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 rounded-xl p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-white mb-2 sm:mb-3">💰 How to Stake</h3>
+            <ol className="text-gray-300 text-xs sm:text-sm space-y-1.5 sm:space-y-2">
+              <li>1. Visit <a href="https://npc-staking.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">npc-staking.vercel.app</a></li>
+              <li>2. Connect your Solana wallet</li>
+              <li>3. Navigate to the staking section</li>
+              <li>4. Choose your stake amount</li>
+              <li>5. Complete the staking process</li>
+              <li>6. Start earning rewards!</li>
+            </ol>
+          </div>
+
           <div className="bg-gradient-to-r from-green-500/20 to-teal-500/20 border border-green-500/30 rounded-xl p-4 sm:p-6">
             <h3 className="text-base sm:text-lg font-semibold text-white mb-2 sm:mb-3">📊 Platform Features</h3>
             <ul className="text-gray-300 text-xs sm:text-sm space-y-1.5 sm:space-y-2">
@@ -261,6 +273,7 @@ I'm here to help with any questions about NickPlaysCrypto!`;
           <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-500/30 rounded-xl p-4 sm:p-6 sm:col-span-2 lg:col-span-1">
             <h3 className="text-base sm:text-lg font-semibold text-white mb-2 sm:mb-3">🔗 External Links</h3>
             <ul className="text-gray-300 text-xs sm:text-sm space-y-1.5 sm:space-y-2">
+              <li>• <a href="https://npc-staking.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">Staking App</a></li>
               <li>• <a href="https://www.nickplayscrypto.com/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">Official Website</a></li>
               <li>• <a href="https://x.com/NickPlaysCrypto" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">Twitter/X</a></li>
               <li>• <a href="https://dexscreener.com/solana/6mpafrxmywfyojaunxdqgw9sq2mhpuh3d6daw3xipump" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">DexScreener</a></li>
