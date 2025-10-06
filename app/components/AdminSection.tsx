@@ -203,10 +203,13 @@ export default function AdminSection() {
     e.preventDefault();
     try {
       await initializePool(stakingMintInput);
-      alert('Pool initialized successfully!');
+      showSuccess('Pool Initialized', 'Pool has been initialized successfully!');
       setStakingMintInput('');
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(
+        'Pool Initialization Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     }
   };
 
@@ -214,11 +217,14 @@ export default function AdminSection() {
     e.preventDefault();
     try {
       await setRewardConfig(rewardMint, parseFloat(ratePerSec));
-      alert('Reward configuration set successfully!');
+      showSuccess('Reward Configuration Set', 'Reward configuration has been set successfully!');
       setRewardMint('');
       setRatePerSec('');
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(
+        'Pool Initialization Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     }
   };
 
@@ -228,18 +234,18 @@ export default function AdminSection() {
       console.log('🔄 Adding reward tokens...');
       await addRewardTokens(parseFloat(rewardAmount));
       console.log('✅ Reward tokens added successfully!');
-      alert('Reward tokens added successfully!');
+      showSuccess('Reward Tokens Added', 'Reward tokens have been added successfully!');
       setRewardAmount('');
     } catch (err) {
       console.error('❌ Failed to add reward tokens:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       
       if (errorMessage.includes('already been processed')) {
-        alert('Transaction was already processed. Please refresh the page and check if tokens were added.');
+        showInfo('Transaction Processed', 'Transaction was already processed. Please refresh the page and check if tokens were added.');
       } else if (errorMessage.includes('wait a few seconds')) {
-        alert('Please wait a few seconds before submitting another transaction.');
+        showWarning('Please Wait', 'Please wait a few seconds before submitting another transaction.');
       } else {
-        alert(`Error: ${errorMessage}`);
+        showError('Transaction Failed', errorMessage);
       }
     }
   };
@@ -247,27 +253,33 @@ export default function AdminSection() {
 
   const handleFetchPool = async () => {
     if (!stakingMintInput) {
-      alert('Please enter a staking mint address first');
+      showWarning('Invalid Input', 'Please enter a staking mint address first');
       return;
     }
     try {
       await fetchPoolByMint(stakingMintInput);
-      alert('Pool data fetched successfully!');
+      showSuccess('Pool Data Fetched', 'Pool data has been fetched successfully!');
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(
+        'Pool Initialization Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     }
   };
 
   const handleSetStakingMint = async () => {
     if (!stakingMintInput) {
-      alert('Please enter a staking mint address first');
+      showWarning('Invalid Input', 'Please enter a staking mint address first');
       return;
     }
     try {
       setStakingMint(stakingMintInput);
-      alert('Staking mint set successfully!');
+      showSuccess('Staking Mint Set', 'Staking mint has been set successfully!');
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(
+        'Pool Initialization Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     }
   };
 
@@ -275,10 +287,13 @@ export default function AdminSection() {
     e.preventDefault();
     try {
       await setRewardRate(parseFloat(newRewardRate));
-      alert('Reward rate updated successfully!');
+      showSuccess('Reward Rate Updated', 'Reward rate has been updated successfully!');
       setNewRewardRate('');
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(
+        'Pool Initialization Failed',
+        err instanceof Error ? err.message : 'Unknown error occurred'
+      );
     }
   };
 
