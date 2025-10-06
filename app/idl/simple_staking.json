@@ -44,11 +44,6 @@
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": []
@@ -56,7 +51,7 @@
     {
       "name": "configureRewards",
       "docs": [
-        "One‑shot: set reward mint + initial rate; program creates reward_vault ATA."
+        "One-shot: set reward mint + initial rate; program creates reward_vault ATA."
       ],
       "accounts": [
         {
@@ -96,11 +91,6 @@
         },
         {
           "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
           "isMut": false,
           "isSigner": false
         }
@@ -364,7 +354,7 @@
     {
       "name": "stake",
       "docs": [
-        "Stake (blocked when paused). No auto‑claim."
+        "Stake (blocked when paused). No auto-claim."
       ],
       "accounts": [
         {
@@ -412,11 +402,6 @@
         },
         {
           "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
           "isMut": false,
           "isSigner": false
         }
@@ -481,11 +466,6 @@
           "name": "associatedTokenProgram",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -546,11 +526,6 @@
         },
         {
           "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
           "isMut": false,
           "isSigner": false
         }
@@ -1061,7 +1036,10 @@
     {
       "code": 6011,
       "name": "Reentrancy",
-      "msg": "Re‑entrancy detected"
+      "msg": "Re-entrancy detected"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "CG7e3BfRFQn1AVUdXFRUsQBiKHtSpCiH7afhpJaoE4PT"
+  }
 }
