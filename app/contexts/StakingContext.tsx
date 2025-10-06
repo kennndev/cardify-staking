@@ -45,14 +45,17 @@ interface PoolData {
   poolAddress: string;     // Pool PDA (base58)
   admin: string;
   stakingMint: string;
-  rewardMint: string;
   stakingVault: string;
+  rewardConfigured: boolean;  // ADD: matches contract
+  rewardMint: string;
   rewardVault: string;
+  rewardRatePerSec: number;   // RENAME: from ratePerSec
+  rateCap: number;           // ADD: matches contract
   totalStaked: number;
-  accScaled: string;       // big number-safe
+  accScaled: string;         // big number-safe
   lastUpdateTs: number;
-  ratePerSec: number;
   paused: boolean;
+  locked: boolean;           // ADD: matches contract
   bump: number;
   signerBump: number;
 }
@@ -62,6 +65,7 @@ interface UserData {
   staked: number;
   debt: string;            // big number-safe
   unpaidRewards: string;   // big number-safe
+  bump: number;           // ADD: matches contract
 }
 
 interface StakingContextType {
@@ -100,7 +104,13 @@ interface StakingContextType {
   } | null>;
   stake: (amount: number) => Promise<void>;
   unstake: (amount: number) => Promise<void>;
+  emergencyUnstake: (amount: number) => Promise<void>;
   claim: () => Promise<void>;
+  withdrawRewards: (amount: number) => Promise<void>;
+  setAdmin: (newAdmin: string) => Promise<void>;
+  ensureVaults: () => Promise<void>;
+  closeUser: () => Promise<void>;
+  closePool: () => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -232,14 +242,17 @@ export function StakingProvider({ children }: { children: ReactNode }) {
           poolAddress: poolPDA.toBase58(),
           admin: pool.admin?.toBase58() ?? 'Unknown',
           stakingMint: pool.stakingMint?.toBase58() ?? 'Unknown',
-          rewardMint: pool.rewardMint?.toBase58() ?? 'Unknown',
           stakingVault: pool.stakingVault?.toBase58() ?? 'Unknown',
+          rewardConfigured: pool.rewardConfigured ?? false,
+          rewardMint: pool.rewardMint?.toBase58() ?? 'Unknown',
           rewardVault: pool.rewardVault?.toBase58() ?? 'Unknown',
+          rewardRatePerSec: pool.rewardRatePerSec?.toNumber?.() ?? 0,
+          rateCap: pool.rateCap?.toNumber?.() ?? 0,
           totalStaked: pool.totalStaked?.toNumber?.() ?? 0,
           accScaled: pool.accScaled?.toString?.() ?? '0',
           lastUpdateTs: pool.lastUpdateTs?.toNumber?.() ?? 0,
-          ratePerSec: pool.rewardRatePerSec?.toNumber?.() ?? 0,  // <-- Fixed: was pool.ratePerSec
           paused: pool.paused ?? false,
+          locked: pool.locked ?? false,
           bump: pool.bump ?? 0,
           signerBump: pool.signerBump ?? 0,
         });
@@ -261,6 +274,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
             staked: user.staked?.toNumber?.() ?? 0,
             debt: user.debt?.toString?.() ?? '0',
             unpaidRewards: user.unpaidRewards?.toString?.() ?? '0',
+            bump: user.bump ?? 0,
           });
         } else {
           console.log('❌ User account not found - user needs to initialize');
@@ -451,14 +465,17 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         poolAddress: poolPDA.toString(),
         admin: pool.admin?.toString() ?? 'Unknown',
         stakingMint: pool.stakingMint?.toString() ?? 'Unknown',
-        rewardMint: pool.rewardMint?.toString() ?? 'Unknown',
         stakingVault: pool.stakingVault?.toString() ?? 'Unknown',
+        rewardConfigured: pool.rewardConfigured ?? false,
+        rewardMint: pool.rewardMint?.toString() ?? 'Unknown',
         rewardVault: pool.rewardVault?.toString() ?? 'Unknown',
+        rewardRatePerSec: pool.rewardRatePerSec?.toNumber?.() ?? 0,
+        rateCap: pool.rateCap?.toNumber?.() ?? 0,
         totalStaked: pool.totalStaked?.toNumber?.() ?? 0,
         accScaled: pool.accScaled?.toString?.() ?? '0',
         lastUpdateTs: pool.lastUpdateTs?.toNumber?.() ?? 0,
-        ratePerSec: pool.rewardRatePerSec?.toNumber?.() ?? 0,
         paused: pool.paused ?? false,
+        locked: pool.locked ?? false,
         bump: pool.bump ?? 0,
         signerBump: pool.signerBump ?? 0,
       });
@@ -494,6 +511,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
           staked: user.staked?.toNumber?.() ?? 0,
           debt: user.debt?.toString?.() ?? '0',
           unpaidRewards: user.unpaidRewards?.toString?.() ?? '0',
+          bump: user.bump ?? 0,
         });
         console.log('User data fetched:', user);
       } catch (userError) {
@@ -557,14 +575,17 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         poolAddress: initRes.pool,
         admin: initRes.admin,
         stakingMint: initRes.stakingMint,
-        rewardMint: '11111111111111111111111111111111',
         stakingVault: initRes.stakingVault,
+        rewardConfigured: false,
+        rewardMint: '11111111111111111111111111111111',
         rewardVault: '11111111111111111111111111111111',
+        rewardRatePerSec: Number(initRes.ratePerSec),
+        rateCap: 0,
         totalStaked: Number(initRes.totalStaked),
         accScaled: '0',
         lastUpdateTs: Math.floor(Date.now() / 1000),
-        ratePerSec: Number(initRes.ratePerSec),
         paused: false,
+        locked: false,
         bump: 0,
         signerBump: 0,
       });
@@ -983,7 +1004,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       if (poolData && poolData.rewardMint && poolData.rewardMint !== '11111111111111111111111111111111') {
         console.log('❌ Pool rewards are already configured!');
         console.log('Current reward mint:', poolData.rewardMint);
-        console.log('Current rate per sec:', poolData.ratePerSec);
+        console.log('Current rate per sec:', poolData.rewardRatePerSec);
         console.log('💡 Use setRewardRate to update the rate instead');
         throw new Error('Pool rewards are already configured. Use setRewardRate to update the rate instead.');
       }
@@ -1707,21 +1728,21 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     try {
              console.log('🔍 APY Calculation Debug:', {
                rewardMint: poolData.rewardMint,
-               ratePerSec: poolData.ratePerSec,
+               ratePerSec: poolData.rewardRatePerSec,
                totalStaked: poolData.totalStaked,
                rewardConfigured: poolData.rewardMint !== '11111111111111111111111111111111'
              });
              
              // Show the current rate in human-readable format
-             if (poolData.ratePerSec > 0) {
+             if (poolData.rewardRatePerSec > 0) {
                const rewardMintPk = new PublicKey(poolData.rewardMint);
                const { getMint } = await import('@solana/spl-token');
                const rewardInfo = await getMint(connection, rewardMintPk);
                const rewDec = rewardInfo.decimals ?? 0;
-               const ratePerSecUI = poolData.ratePerSec / (10 ** rewDec);
+               const ratePerSecUI = poolData.rewardRatePerSec / (10 ** rewDec);
                
                console.log('📊 Current Rate Settings:', {
-                 baseUnits: poolData.ratePerSec,
+                 baseUnits: poolData.rewardRatePerSec,
                  humanReadable: ratePerSecUI,
                  decimals: rewDec,
                  perSecond: `${ratePerSecUI} tokens per second`,
@@ -1736,9 +1757,9 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         return null;
       }
       
-             if (poolData.ratePerSec <= 0) {
+             if (poolData.rewardRatePerSec <= 0) {
                console.log('❌ Invalid rate:', {
-                 ratePerSec: poolData.ratePerSec,
+                 ratePerSec: poolData.rewardRatePerSec,
                  reason: 'Rate is 0 or negative'
                });
         return null;
@@ -1760,7 +1781,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
                const rewDec = rewardInfo.decimals ?? 0;
                
                // Convert base units → UI units
-               const ratePerSecUI = poolData.ratePerSec / (10 ** rewDec);
+               const ratePerSecUI = poolData.rewardRatePerSec / (10 ** rewDec);
                const theoreticalStaked = 1; // 1 token staked
                
                const secondsPerYear = 31_536_000;
@@ -1783,7 +1804,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
                  secondsPerYear,
                  apyPercent,
                  decimals: { staking: stakeDec, reward: rewDec },
-                 baseUnits: { ratePerSec: poolData.ratePerSec, totalStaked: poolData.totalStaked },
+                 baseUnits: { ratePerSec: poolData.rewardRatePerSec, totalStaked: poolData.totalStaked },
                  isTheoretical: true
                };
       }
@@ -1799,7 +1820,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       const rewDec = rewardInfo.decimals ?? 0;
 
       // Convert base units → UI units
-      const ratePerSecUI = poolData.ratePerSec / (10 ** rewDec);
+      const ratePerSecUI = poolData.rewardRatePerSec / (10 ** rewDec);
       const totalStakedUI = poolData.totalStaked / (10 ** stakeDec);
 
       if (totalStakedUI <= 0) return null;
@@ -1816,7 +1837,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
         secondsPerYear,
         apyPercent,
         decimals: { staking: stakeDec, reward: rewDec },
-        baseUnits: { ratePerSec: poolData.ratePerSec, totalStaked: poolData.totalStaked }
+        baseUnits: { ratePerSec: poolData.rewardRatePerSec, totalStaked: poolData.totalStaked }
       };
 
       console.log('🔍 APY Debugger:', breakdown);
@@ -1844,7 +1865,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       console.log('Current pool data:', {
         poolAddress: poolData.poolAddress,
         rewardMint: poolData.rewardMint,
-        ratePerSec: poolData.ratePerSec,
+        ratePerSec: poolData.rewardRatePerSec,
         totalStaked: poolData.totalStaked,
         admin: poolData.admin
       });
@@ -1853,7 +1874,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       if (poolData.rewardMint && poolData.rewardMint !== '11111111111111111111111111111111') {
         console.log('✅ Reward configuration is already set!');
         console.log('Reward Mint:', poolData.rewardMint);
-        console.log('Rate Per Second:', poolData.ratePerSec);
+        console.log('Rate Per Second:', poolData.rewardRatePerSec);
         
         // Compute APY with detailed breakdown
         const apyBreakdown = await computeApy();
@@ -1866,7 +1887,7 @@ export function StakingProvider({ children }: { children: ReactNode }) {
       } else {
         console.log('❌ Reward configuration not set yet');
         console.log('Reward Mint:', poolData.rewardMint);
-        console.log('Rate Per Second:', poolData.ratePerSec);
+        console.log('Rate Per Second:', poolData.rewardRatePerSec);
       }
     } catch (e) {
       console.error('Failed to check pool state:', e);
@@ -2247,6 +2268,255 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     return { poolPDA, bump };
   };
 
+  // Emergency unstake - principal only, no rewards
+  const emergencyUnstake = async (amount: number) => {
+    if (!walletAddress || !poolData) throw new Error('Wallet not connected or pool not initialized');
+    setIsLoading(true);
+    setError(null);
+    try {
+      console.log('Emergency unstaking tokens:', { amount, walletAddress, poolAddress: poolData.poolAddress });
+      
+      const wallet = {
+        publicKey: pk(walletAddress),
+        signTransaction: (window as any).solana?.signTransaction,
+        signAllTransactions: (window as any).solana?.signAllTransactions,
+      } as any;
+      
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+      const program = await loadProgram(provider);
+      
+      const poolPDA = pk(poolData.poolAddress);
+      const stakingMintPk = pk(poolData.stakingMint);
+      
+      const tx = await program.methods.emergencyUnstake(new BN(amount)).accounts({
+        owner: pk(walletAddress),
+        pool: poolPDA,
+        poolSigner: pk(poolData.poolAddress), // This will be derived correctly by Anchor
+        userStakingAta: await getAssociatedTokenAddress(stakingMintPk, pk(walletAddress)),
+        stakingVault: pk(poolData.stakingVault),
+        user: userPda(program.programId, poolPDA, pk(walletAddress)),
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      }).rpc();
+      
+      console.log('✅ Emergency unstake successful:', tx);
+      await refreshData();
+    } catch (e: any) {
+      console.error('❌ Emergency unstake failed:', e);
+      setError(e?.message ?? 'Failed to emergency unstake');
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin function: withdraw rewards (only when paused)
+  const withdrawRewards = async (amount: number) => {
+    if (!isAdmin || !walletAddress || !poolData) throw new Error('Admin access required');
+    setIsLoading(true);
+    setError(null);
+    try {
+      console.log('Withdrawing rewards:', { amount, poolAddress: poolData.poolAddress });
+      
+      const wallet = {
+        publicKey: pk(walletAddress),
+        signTransaction: (window as any).solana?.signTransaction,
+        signAllTransactions: (window as any).solana?.signAllTransactions,
+      } as any;
+      
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+      const program = await loadProgram(provider);
+      
+      const poolPDA = pk(poolData.poolAddress);
+      const rewardMintPk = pk(poolData.rewardMint);
+      
+      const tx = await program.methods.withdrawRewards(new BN(amount)).accounts({
+        pool: poolPDA,
+        admin: pk(walletAddress),
+        poolSigner: pk(poolData.poolAddress), // This will be derived correctly by Anchor
+        rewardVault: pk(poolData.rewardVault),
+        adminRewardAta: await getAssociatedTokenAddress(rewardMintPk, pk(walletAddress)),
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      }).rpc();
+      
+      console.log('✅ Rewards withdrawn successfully:', tx);
+      await refreshData();
+    } catch (e: any) {
+      console.error('❌ Withdraw rewards failed:', e);
+      setError(e?.message ?? 'Failed to withdraw rewards');
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin function: set new admin
+  const setAdmin = async (newAdmin: string) => {
+    if (!isAdmin || !walletAddress || !poolData) throw new Error('Admin access required');
+    setIsLoading(true);
+    setError(null);
+    try {
+      console.log('Setting new admin:', { newAdmin, poolAddress: poolData.poolAddress });
+      
+      const wallet = {
+        publicKey: pk(walletAddress),
+        signTransaction: (window as any).solana?.signTransaction,
+        signAllTransactions: (window as any).solana?.signAllTransactions,
+      } as any;
+      
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+      const program = await loadProgram(provider);
+      
+      const poolPDA = pk(poolData.poolAddress);
+      
+      const tx = await program.methods.setAdmin(pk(newAdmin)).accounts({
+        pool: poolPDA,
+        admin: pk(walletAddress),
+      }).rpc();
+      
+      console.log('✅ Admin updated successfully:', tx);
+      await refreshData();
+    } catch (e: any) {
+      console.error('❌ Set admin failed:', e);
+      setError(e?.message ?? 'Failed to set admin');
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin function: ensure vaults exist
+  const ensureVaults = async () => {
+    if (!isAdmin || !walletAddress || !poolData) throw new Error('Admin access required');
+    setIsLoading(true);
+    setError(null);
+    try {
+      console.log('Ensuring vaults exist:', { poolAddress: poolData.poolAddress });
+      
+      const wallet = {
+        publicKey: pk(walletAddress),
+        signTransaction: (window as any).solana?.signTransaction,
+        signAllTransactions: (window as any).solana?.signAllTransactions,
+      } as any;
+      
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+      const program = await loadProgram(provider);
+      
+      const poolPDA = pk(poolData.poolAddress);
+      const stakingMintPk = pk(poolData.stakingMint);
+      const rewardMintPk = poolData.rewardConfigured ? pk(poolData.rewardMint) : undefined;
+      
+      const accounts: any = {
+        pool: poolPDA,
+        admin: pk(walletAddress),
+        poolSigner: pk(poolData.poolAddress), // This will be derived correctly by Anchor
+        stakingMint: stakingMintPk,
+        stakingVault: pk(poolData.stakingVault),
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      };
+
+      if (rewardMintPk) {
+        accounts.rewardMint = rewardMintPk;
+        accounts.rewardVault = pk(poolData.rewardVault);
+      }
+      
+      const tx = await program.methods.ensureVaults().accounts(accounts).rpc();
+      
+      console.log('✅ Vaults ensured successfully:', tx);
+      await refreshData();
+    } catch (e: any) {
+      console.error('❌ Ensure vaults failed:', e);
+      setError(e?.message ?? 'Failed to ensure vaults');
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Close user account
+  const closeUser = async () => {
+    if (!walletAddress || !poolData) throw new Error('Wallet not connected or pool not initialized');
+    setIsLoading(true);
+    setError(null);
+    try {
+      console.log('Closing user account:', { walletAddress, poolAddress: poolData.poolAddress });
+      
+      const wallet = {
+        publicKey: pk(walletAddress),
+        signTransaction: (window as any).solana?.signTransaction,
+        signAllTransactions: (window as any).solana?.signAllTransactions,
+      } as any;
+      
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+      const program = await loadProgram(provider);
+      
+      const poolPDA = pk(poolData.poolAddress);
+      
+      const tx = await program.methods.closeUser().accounts({
+        owner: pk(walletAddress),
+        pool: poolPDA,
+        user: userPda(program.programId, poolPDA, pk(walletAddress)),
+      }).rpc();
+      
+      console.log('✅ User account closed successfully:', tx);
+      await refreshData();
+    } catch (e: any) {
+      console.error('❌ Close user failed:', e);
+      setError(e?.message ?? 'Failed to close user account');
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin function: close pool
+  const closePool = async () => {
+    if (!isAdmin || !walletAddress || !poolData) throw new Error('Admin access required');
+    setIsLoading(true);
+    setError(null);
+    try {
+      console.log('Closing pool:', { poolAddress: poolData.poolAddress });
+      
+      const wallet = {
+        publicKey: pk(walletAddress),
+        signTransaction: (window as any).solana?.signTransaction,
+        signAllTransactions: (window as any).solana?.signAllTransactions,
+      } as any;
+      
+      const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+      const program = await loadProgram(provider);
+      
+      const poolPDA = pk(poolData.poolAddress);
+      
+      const accounts: any = {
+        pool: poolPDA,
+        admin: pk(walletAddress),
+        poolSigner: pk(poolData.poolAddress), // This will be derived correctly by Anchor
+        stakingVault: pk(poolData.stakingVault),
+        tokenProgram: TOKEN_PROGRAM_ID,
+      };
+
+      if (poolData.rewardConfigured) {
+        accounts.rewardVault = pk(poolData.rewardVault);
+      }
+      
+      const tx = await program.methods.closePool().accounts(accounts).rpc();
+      
+      console.log('✅ Pool closed successfully:', tx);
+      await refreshData();
+    } catch (e: any) {
+      console.error('❌ Close pool failed:', e);
+      setError(e?.message ?? 'Failed to close pool');
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // --- Context value ---------------------------------------------------------
 
   const value: StakingContextType = {
@@ -2275,7 +2545,13 @@ export function StakingProvider({ children }: { children: ReactNode }) {
     computeApy,
     stake,
     unstake,
+    emergencyUnstake,
     claim,
+    withdrawRewards,
+    setAdmin,
+    ensureVaults,
+    closeUser,
+    closePool,
     refreshData,
   };
 
