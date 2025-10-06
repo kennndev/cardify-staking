@@ -63,7 +63,7 @@ export default function StakingPage() {
     user,
     nowSecs
   }: {
-    pool: { accScaled: string; lastUpdateTs: number; ratePerSec: number; totalStaked: number };
+    pool: { accScaled: string; lastUpdateTs: number; rewardRatePerSec: number; totalStaked: number };
     user: { staked: number; debt: string; unpaidRewards: string };
     nowSecs: number;
   }) => {
@@ -75,7 +75,7 @@ export default function StakingPage() {
     const staked = BigInt(user.staked ?? 0);
 
     const dt = BigInt(Math.max(0, nowSecs - (pool.lastUpdateTs ?? nowSecs)));
-    const rate = BigInt(pool.ratePerSec ?? 0);
+    const rate = BigInt(pool.rewardRatePerSec ?? 0);
     const totalStaked = BigInt(pool.totalStaked ?? 0);
 
     // head-of-line accumulator: accScaled + (rate * dt / totalStaked) * SCALAR
@@ -96,7 +96,7 @@ export default function StakingPage() {
       pool: {
         accScaled: poolData.accScaled,
         lastUpdateTs: poolData.lastUpdateTs,
-        ratePerSec: poolData.ratePerSec,
+        rewardRatePerSec: poolData.rewardRatePerSec,
         totalStaked: poolData.totalStaked,
       },
       user: {
@@ -147,7 +147,7 @@ export default function StakingPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Reward Rate:</span>
-                  <span className="text-white font-medium">{poolData.ratePerSec}/sec</span>
+                  <span className="text-white font-medium">{poolData.rewardRatePerSec}/sec</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Status:</span>
